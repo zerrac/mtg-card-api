@@ -27,6 +27,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        Image.objects.all().delete()
         Card.objects.all().delete()
 
         def create_cards(cards):
