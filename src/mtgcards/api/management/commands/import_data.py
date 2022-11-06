@@ -1,11 +1,11 @@
 import os
 from tqdm import tqdm
-import requests
+import urllib.request
 import ijson
 import functools
 
 from django.core.management.base import BaseCommand, CommandError
-import mtgcards.api.utils.scryfall as scryfall
+import mtgcards.api.lib.scryfall as scryfall
 from mtgcards.api.models import Card
 
 
@@ -53,10 +53,14 @@ class Command(BaseCommand):
         if options["online"]:
             buf_size = 65536
             bulk_url, bulk_size = scryfall.get_bulk_url()
-            re = requests.get(bulk_url, stream=True)
-            re.raise_for_status()
-            re.raw.decode_content = True
-            f = re.raw
+            req = urllib.request.Request(
+                bulk_url,
+                data=None,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+                }
+            )
+            f = urllib.request.urlopen(req)
             tqdm_desc = "Downloading %s " % bulk_url.split("/")[-1]
         elif options["bulk_file"]:
             buf_size = 65536
