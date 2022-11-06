@@ -1,0 +1,44 @@
+version: '3.3'
+
+services:
+  db:
+    image: postgres
+    restart: "on-failure"
+    environment:
+      - POSTGRES_DB=djangodb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+  web:
+    build:
+      context: ./src
+    restart: "on-failure"
+    command: sh -c "python manage.py makemigrations &&
+                    python manage.py migrate &&
+                  /usr/local/bin/gunicorn --reload mtgcards.wsgi:application -w 2 -b :8000"
+    environment:
+      DEBUG: 'true'
+    env_file: .env
+    volumes:
+      - ./src/:/code
+      - django_static:/static/
+      - django_media:/django_media/
+    ports: 
+      - "8000"
+    depends_on:
+      - db
+
+  nginx: 
+      build: 
+        context: ./nginx
+      restart: "on-failure"
+      env_file: .env
+      ports: 
+        - 8000:80 
+      volumes:  
+        - django_static:/static/
+        - django_media:/django_media/
+      depends_on:
+        - web
+volumes:
+  django_static:
+  django_media:

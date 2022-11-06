@@ -1,0 +1,9 @@
+gunicorn
+django
+djangorestframework
+requests
+psycopg2-binary
+pillow 
+opencv-python
+ijson
+tqdm
