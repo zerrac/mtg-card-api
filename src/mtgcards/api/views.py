@@ -53,14 +53,14 @@ class CardApiView(APIView):
 
         selected_print = self.select_best_candidate(prints, preferred_lang)
 
-        image = Image.objects.filter(card=selected_print, extension=image_format)[0]
+        image = Image.objects.get(card=selected_print, extension=image_format)
 
         if not image.image:
             image.download()
 
         if image.bluriness < 200 and preferred_lang != "en":
             selected_print = self.select_best_candidate(prints, preferred_lang)
-            image = image.objects.filter(card=selected_print, extension=image_format)[0]
+            image = Image.objects.get(card=selected_print, extension=image_format)
 
             if not image.image:
                 image.download()
