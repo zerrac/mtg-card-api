@@ -10,9 +10,9 @@ from rest_framework.views import APIView
 import requests
 
 import os
-import mtgcards.api.lib.scryfall as scryfall
+import mtgcards.api.utils.scryfall as scryfall
 
-import mtgcards.api.lib.images as images
+import mtgcards.api.utils.images as images
 
 
 def evaluate_card_score(card: Card, preferred_lang="fr"):

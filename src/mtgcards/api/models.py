@@ -1,5 +1,5 @@
 from django.db import models
-import mtgcards.api.lib.scryfall as scryfall
+import mtgcards.api.utils.scryfall as scryfall
 
 # Create your models here.
 

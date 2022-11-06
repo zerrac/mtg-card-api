@@ -5,7 +5,7 @@ import ijson
 import functools
 
 from django.core.management.base import BaseCommand, CommandError
-import mtgcards.api.lib.scryfall as scryfall
+import mtgcards.api.utils.scryfall as scryfall
 from mtgcards.api.models import Card
 
 
