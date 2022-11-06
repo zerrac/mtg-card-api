@@ -33,7 +33,7 @@ services:
       restart: "on-failure"
       env_file: .env
       ports: 
-        - 8000:80 
+        - 127.0.0.1:8000:80 
       volumes:  
         - django_static:/static/
         - django_media:/django_media/
