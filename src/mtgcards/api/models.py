@@ -55,6 +55,11 @@ class Image(models.Model):
     bluriness = models.FloatField(default=0.0)
     size = models.IntegerField(default=0)
     card = models.ForeignKey(Card, on_delete=models.CASCADE, blank=True, null=True)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['card'], condition=models.Q(extension="png"), name='unique_png_card'),
+            models.UniqueConstraint(fields=['card'], condition=models.Q(extension="jpg"), name='unique_jpg_card')
+        ]
 
     def getsize(self):
         if self.size == 0:
