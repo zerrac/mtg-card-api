@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 from pathlib import Path
 import os
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,7 +23,14 @@ MEDIA_ROOT = os.path.join("/django_media/")
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ["SECRET_KEY"]
+if (
+    "DJANGO_SECRET_KEY" in os.environ
+    and os.environ["DJANGO_SECRET_KEY"] != "CHANGE_ME"
+    and os.environ["DJANGO_SECRET_KEY"] != ""
+):
+    SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
+else:
+    raise ImproperlyConfigured("Please set DJANGO_SECRET_KEY in .env")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "NO").lower() in ("on", "true", "y", "yes")
@@ -122,7 +130,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = "/static/"
-MEDIA_URL =  "/media/"
+MEDIA_URL = "/media/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
