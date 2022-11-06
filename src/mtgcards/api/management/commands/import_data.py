@@ -66,7 +66,7 @@ class Command(BaseCommand):
             Card.objects.bulk_create(objs=cards_models)
             Image.objects.bulk_create(objs=images_models)
 
-        buf_size = 6553600
+        buf_size = 655360
         cards = ijson.sendable_list()
         coro = ijson.items_coro(cards, "item")
         if options["online"]:
