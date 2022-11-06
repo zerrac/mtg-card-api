@@ -7,6 +7,7 @@ import functools
 from django.core.management.base import BaseCommand, CommandError
 import mtgcards.api.utils.scryfall as scryfall
 from mtgcards.api.models import Card
+from mtgcards.api.models import Image
 
 
 class Command(BaseCommand):
@@ -30,6 +31,7 @@ class Command(BaseCommand):
 
         def create_cards(cards):
             cards_models=[]
+            images_models=[]
             for card in cards:
                 try:
                     card_model = Card(
@@ -37,18 +39,31 @@ class Command(BaseCommand):
                         collector_number=card["collector_number"],
                         edition=card["set"],
                         image_status=card["image_status"],
-                        png_url=scryfall.get_face_url(card),
                         frame=card["frame"],
                         type_line=scryfall.get_face_type(card),
                         lang=card["lang"],
                         full_art=card["full_art"],
                     )
                     cards_models.append(card_model)
+                    images_models.append(
+                        Image(
+                            card=card_model,
+                            url=scryfall.get_face_url(card,"normal"),
+                            extension="jpg",
+                        ))
+                    images_models.append(
+                        Image(
+                            card=card_model,
+                            url=scryfall.get_face_url(card,"png"),
+                            extension="png",
+                        ),
+                    )
                 except:
                     print(card["uri"])
                     raise
-            Card.objects.bulk_create(cards_models)
-
+            Card.objects.bulk_create(objs=cards_models)
+            Image.objects.bulk_create(objs=images_models)
+            
         buf_size = 6553600
         cards = ijson.sendable_list()
         coro = ijson.items_coro(cards, "item")
