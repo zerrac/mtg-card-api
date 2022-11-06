@@ -29,6 +29,7 @@ class Command(BaseCommand):
         Card.objects.all().delete()
 
         def create_cards(cards):
+            cards_models=[]
             for card in cards:
                 try:
                     card_model = Card(
@@ -42,16 +43,16 @@ class Command(BaseCommand):
                         lang=card["lang"],
                         full_art=card["full_art"],
                     )
-                    card_model.save()
+                    cards_models.append(card_model)
                 except:
                     print(card["uri"])
                     raise
+            Card.objects.bulk_create(cards_models)
 
-        buf_size = 65536
+        buf_size = 6553600
         cards = ijson.sendable_list()
         coro = ijson.items_coro(cards, "item")
         if options["online"]:
-            buf_size = 65536
             bulk_url, bulk_size = scryfall.get_bulk_url()
             req = urllib.request.Request(
                 bulk_url,
@@ -63,7 +64,6 @@ class Command(BaseCommand):
             f = urllib.request.urlopen(req)
             tqdm_desc = "Downloading %s " % bulk_url.split("/")[-1]
         elif options["bulk_file"]:
-            buf_size = 65536
             f = open(options["bulk_file"], "rb")
             bulk_size = os.path.getsize(options["bulk_file"])
             tqdm_desc = "Loading %s " % os.path.basename(options["bulk_file"])
