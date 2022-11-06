@@ -7,13 +7,18 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0008_auto_20221106_2008'),
+        ("api", "0008_auto_20221106_2008"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='image',
-            name='card',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='api.card'),
+            model_name="image",
+            name="card",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="api.card",
+            ),
         ),
     ]

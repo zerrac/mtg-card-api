@@ -6,8 +6,8 @@ import os.path
 import shutil
 import sys
 
-class Throttle:
 
+class Throttle:
     def __init__(self, delay: float = 0.05):
         self.delay = delay
         self.lock = threading.Lock()
@@ -20,28 +20,29 @@ class Throttle:
             self.time = time.time()
         return self
 
-
-    def __exit__(self,exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
+
 rate_limiter = Throttle()
-SCRYFALL_URL="https://api.scryfall.com"
+SCRYFALL_URL = "https://api.scryfall.com"
 
 http = requests.Session()
-retries = Retry(total=5,
-                status_forcelist=[ 429, 500, 502, 503, 504])
+retries = Retry(total=5, status_forcelist=[429, 500, 502, 503, 504])
 
-http.mount('http://', HTTPAdapter(max_retries=retries))
-http.mount('https://', HTTPAdapter(max_retries=retries))
+http.mount("http://", HTTPAdapter(max_retries=retries))
+http.mount("https://", HTTPAdapter(max_retries=retries))
+
 
 def image_getsize(url):
     with rate_limiter:
-        re =  http.head(url)
+        re = http.head(url)
     re.raise_for_status()
-    if 'Content-Length' in re.headers.keys():
-        return int(re.headers['Content-Length'])
-    else: 
+    if "Content-Length" in re.headers.keys():
+        return int(re.headers["Content-Length"])
+    else:
         return 0
+
 
 def get_data(url):
     with rate_limiter:
@@ -54,8 +55,9 @@ def get_data(url):
 
     return data
 
+
 def get_bulk_url(database_type="all_cards"):
-    databases = get_data(SCRYFALL_URL+"/bulk-data")
+    databases = get_data(SCRYFALL_URL + "/bulk-data")
     online_db = []
     for database in databases:
         if database["type"] == database_type:
@@ -63,17 +65,18 @@ def get_bulk_url(database_type="all_cards"):
             break
     return online_db["download_uri"], online_db["compressed_size"]
 
-def get_face_url(card,type="png"):
+
+def get_face_url(card, type="png"):
     if card["image_status"] == "missing":
         return "missing"
-    if 'image_uris' in card:
-        return card['image_uris'][type]
-    elif 'card_faces' in card:
-        return  card['card_faces'][0]['image_uris'][type]
-    
+    if "image_uris" in card:
+        return card["image_uris"][type]
+    elif "card_faces" in card:
+        return card["card_faces"][0]["image_uris"][type]
+
 
 def get_face_type(card):
-    if 'type_line' in card:
-        return card['type_line']
-    elif 'card_faces' in card:
-        return  card['card_faces'][0]['type_line']
+    if "type_line" in card:
+        return card["type_line"]
+    elif "card_faces" in card:
+        return card["card_faces"][0]["type_line"]

@@ -4,19 +4,20 @@ import requests
 
 import mtgcards.api.utils.images as images
 import mtgcards.api.utils.scryfall as scryfall
+
 # Create your models here.
 class Card(models.Model):
     name = models.CharField(max_length=500)
     collector_number = models.CharField(max_length=10)
     edition = models.CharField(max_length=10)
-    
-    #Image info
+
+    # Image info
     image_status = models.CharField(max_length=100, default="")
     frame = models.CharField(max_length=10, default="")
     type_line = models.CharField(max_length=500, default="")
     lang = models.CharField(max_length=10, default="")
     full_art = models.BooleanField(default=False)
-    
+
     def evaluate_score(self, preferred_lang="fr"):
         score = 0
         if self.lang == preferred_lang:
@@ -42,7 +43,6 @@ class Card(models.Model):
             score += 1
 
         return score
-
 
     def __str__(self):
         return self.name

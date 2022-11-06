@@ -6,35 +6,46 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0007_card_png_bluriness'),
+        ("api", "0007_card_png_bluriness"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Image',
+            name="Image",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('image', models.ImageField(blank=True, null=True, upload_to='cards_images')),
-                ('extension', models.CharField(default='', max_length=10)),
-                ('url', models.URLField(default='')),
-                ('bluriness', models.FloatField(default=0.0)),
-                ('size', models.IntegerField(default=0)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "image",
+                    models.ImageField(blank=True, null=True, upload_to="cards_images"),
+                ),
+                ("extension", models.CharField(default="", max_length=10)),
+                ("url", models.URLField(default="")),
+                ("bluriness", models.FloatField(default=0.0)),
+                ("size", models.IntegerField(default=0)),
             ],
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='image_png',
+            model_name="card",
+            name="image_png",
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='image_size',
+            model_name="card",
+            name="image_size",
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='png_bluriness',
+            model_name="card",
+            name="png_bluriness",
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='png_url',
+            model_name="card",
+            name="png_url",
         ),
     ]

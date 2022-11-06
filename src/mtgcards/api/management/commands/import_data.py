@@ -30,8 +30,8 @@ class Command(BaseCommand):
         Card.objects.all().delete()
 
         def create_cards(cards):
-            cards_models=[]
-            images_models=[]
+            cards_models = []
+            images_models = []
             for card in cards:
                 try:
                     card_model = Card(
@@ -48,13 +48,14 @@ class Command(BaseCommand):
                     images_models.append(
                         Image(
                             card=card_model,
-                            url=scryfall.get_face_url(card,"normal"),
+                            url=scryfall.get_face_url(card, "normal"),
                             extension="jpg",
-                        ))
+                        )
+                    )
                     images_models.append(
                         Image(
                             card=card_model,
-                            url=scryfall.get_face_url(card,"png"),
+                            url=scryfall.get_face_url(card, "png"),
                             extension="png",
                         ),
                     )
@@ -63,7 +64,7 @@ class Command(BaseCommand):
                     raise
             Card.objects.bulk_create(objs=cards_models)
             Image.objects.bulk_create(objs=images_models)
-            
+
         buf_size = 6553600
         cards = ijson.sendable_list()
         coro = ijson.items_coro(cards, "item")
@@ -73,8 +74,8 @@ class Command(BaseCommand):
                 bulk_url,
                 data=None,
                 headers={
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
-                }
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
+                },
             )
             f = urllib.request.urlopen(req)
             tqdm_desc = "Downloading %s " % bulk_url.split("/")[-1]

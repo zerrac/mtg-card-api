@@ -36,7 +36,7 @@ class CardApiView(APIView):
             card = request.GET["name"]
         else:
             return Response({"error": "missing name parameter"})
-        
+
         if "format" in request.GET:
             image_format = request.GET["format"]
         else:
@@ -53,18 +53,14 @@ class CardApiView(APIView):
 
         selected_print = self.select_best_candidate(prints, preferred_lang)
 
-        image = Image.objects.filter(
-            card=selected_print, extension=image_format
-        )[0]
-        
+        image = Image.objects.filter(card=selected_print, extension=image_format)[0]
+
         if not image.image:
             image.download()
 
         if image.bluriness < 200 and preferred_lang != "en":
             selected_print = self.select_best_candidate(prints, preferred_lang)
-            image = image.objects.filter(
-                card=selected_print, extension=image_format
-            )[0]
+            image = image.objects.filter(card=selected_print, extension=image_format)[0]
 
             if not image.image:
                 image.download()
@@ -75,9 +71,7 @@ class CardApiView(APIView):
             )
         else:
             response = Response(status=302)
-            response["location"] = request.build_absolute_uri(
-                image.image.url
-            )
+            response["location"] = request.build_absolute_uri(image.image.url)
         return response
 
     def select_best_candidate(self, prints, preferred_lang="fr", extension="jpg"):
@@ -91,7 +85,7 @@ class CardApiView(APIView):
             print_score = print.evaluate_score(preferred_lang)
             if print_score > best_score:
                 selected_print = print
-                selected_image =  Image.objects.filter(card=print, extension=extension)
+                selected_image = Image.objects.filter(card=print, extension=extension)
                 best_score = print_score
                 selected_print_content_length = selected_image[0].getsize()
         return selected_print
