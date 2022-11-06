@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0003_alter_card_image_status'),
+        ("api", "0003_alter_card_image_status"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='card',
-            name='type_line',
-            field=models.CharField(default='', max_length=200),
+            model_name="card",
+            name="type_line",
+            field=models.CharField(default="", max_length=200),
         ),
     ]

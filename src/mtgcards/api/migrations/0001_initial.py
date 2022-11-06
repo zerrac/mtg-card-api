@@ -7,25 +7,35 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Card',
+            name="Card",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100)),
-                ('collector_number', models.CharField(max_length=10)),
-                ('edition', models.CharField(max_length=10)),
-                ('image_png', models.ImageField(blank=True, null=True, upload_to='cards_images')),
-                ('image_status', models.CharField(default='', max_length=10)),
-                ('png_url', models.URLField(default='')),
-                ('image_size', models.IntegerField(default=0)),
-                ('frame', models.CharField(default='', max_length=10)),
-                ('type_line', models.CharField(default='', max_length=30)),
-                ('lang', models.CharField(default='', max_length=10)),
-                ('full_art', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("collector_number", models.CharField(max_length=10)),
+                ("edition", models.CharField(max_length=10)),
+                (
+                    "image_png",
+                    models.ImageField(blank=True, null=True, upload_to="cards_images"),
+                ),
+                ("image_status", models.CharField(default="", max_length=10)),
+                ("png_url", models.URLField(default="")),
+                ("image_size", models.IntegerField(default=0)),
+                ("frame", models.CharField(default="", max_length=10)),
+                ("type_line", models.CharField(default="", max_length=30)),
+                ("lang", models.CharField(default="", max_length=10)),
+                ("full_art", models.BooleanField(default=False)),
             ],
         ),
     ]

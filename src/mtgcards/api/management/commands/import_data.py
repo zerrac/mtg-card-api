@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         Card.objects.all().delete()
-        
+
         def create_cards(cards):
             for card in cards:
                 try:
@@ -46,6 +46,7 @@ class Command(BaseCommand):
                 except:
                     print(card["uri"])
                     raise
+
         buf_size = 65536
         cards = ijson.sendable_list()
         coro = ijson.items_coro(cards, "item")
@@ -56,12 +57,14 @@ class Command(BaseCommand):
             tqdm_desc = "Downloading %s " % bulk_url.split("/")[-1]
         elif options["bulk_file"]:
             buf_size = 65536
-            f = open(options["bulk_file"], "rb") 
+            f = open(options["bulk_file"], "rb")
             bulk_size = os.path.getsize(options["bulk_file"])
             tqdm_desc = "Loading %s " % os.path.basename(options["bulk_file"])
         else:
-            raise CommandError("import must either be online or you must specify a local bulk file")
-            
+            raise CommandError(
+                "import must either be online or you must specify a local bulk file"
+            )
+
         with tqdm(
             total=bulk_size,
             desc=tqdm_desc,
@@ -75,4 +78,3 @@ class Command(BaseCommand):
                 t.update(buf_size)
             coro.close()
             create_cards(cards)
-

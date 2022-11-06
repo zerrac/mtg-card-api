@@ -5,4 +5,4 @@ from rest_framework import serializers
 class CardSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Card
-        fields = '__all__'
+        fields = "__all__"

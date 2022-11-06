@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0006_alter_card_name'),
+        ("api", "0006_alter_card_name"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='card',
-            name='png_bluriness',
+            model_name="card",
+            name="png_bluriness",
             field=models.FloatField(default=0.0),
         ),
     ]
