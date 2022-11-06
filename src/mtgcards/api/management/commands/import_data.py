@@ -1,6 +1,6 @@
 import os
 from tqdm import tqdm
-from urllib.request import urlopen
+import requests
 import ijson
 import functools
 
@@ -53,7 +53,10 @@ class Command(BaseCommand):
         if options["online"]:
             buf_size = 65536
             bulk_url, bulk_size = scryfall.get_bulk_url()
-            f = urlopen(bulk_url)
+            re = requests.get(bulk_url, stream=True)
+            re.raise_for_status()
+            re.raw.decode_content = True
+            f = re.raw
             tqdm_desc = "Downloading %s " % bulk_url.split("/")[-1]
         elif options["bulk_file"]:
             buf_size = 65536
