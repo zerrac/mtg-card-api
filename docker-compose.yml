@@ -16,8 +16,6 @@ services:
                     python manage.py makemigrations &&
                     python manage.py migrate &&
                   /usr/local/bin/gunicorn --reload mtgcards.wsgi:application -w 2 -b :8000"
-    environment:
-      DEBUG: 'true'
     env_file: .env
     volumes:
       - ./src/:/code
