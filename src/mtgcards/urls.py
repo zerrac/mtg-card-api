@@ -15,22 +15,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from rest_framework import routers
-from mtgcards.api import views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("cards/", views.CardApiView.as_view()),
+    path('', include('mtgcards.api.urls')),
 ]
 
 
-router = routers.DefaultRouter()
-router.register(r"cards", views.CardViewSet)
-
-
-# Wire up our API using automatic URL routing.
-# Additionally, we include login URLs for the browsable API.
-urlpatterns = urlpatterns + [
-    path("api/", include(router.urls)),
-    # path('api-auth/', include('rest_framework.urls', namespace='rest_framework'))
-]

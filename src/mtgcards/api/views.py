@@ -1,6 +1,7 @@
 # Create your views here.
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
+from django.views.generic import TemplateView
 from mtgcards.api.models import Card
 from mtgcards.api.models import Image
 from rest_framework.response import Response
@@ -13,6 +14,8 @@ import requests
 
 import os
 
+class HomePageView(TemplateView):
+    template_name = "home.html"
 class CardFilter(filters.FilterSet):
     face_number = filters.NumberFilter(label="nombre de faces", method="face_number_filter")
     has_back = filters.BooleanFilter(label="A un dos", method="has_back_filter")
