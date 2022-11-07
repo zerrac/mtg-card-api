@@ -12,19 +12,18 @@ class Card(models.Model):
     edition = models.CharField(max_length=10)
 
     scryfall_id = models.CharField(max_length=100, default="")
-    scryfall_oracle_id = models.CharField(max_length=100, default="")
+    oracle_id = models.CharField(max_length=100, default="")
     scryfall_api_url = models.URLField(default="")
 
     # Image info
     image_status = models.CharField(max_length=100, default="")
     frame = models.CharField(max_length=10, default="")
-    type_line = models.CharField(max_length=500, default="")
     lang = models.CharField(max_length=10, default="")
     full_art = models.BooleanField(default=False)
     
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["name","edition", "collector_number",  "lang"], name='unique_card_print'),
+            models.UniqueConstraint(fields=["name", "edition", "collector_number", "lang"], name='unique_card_print'),
         ]
         
     def evaluate_score(self, preferred_lang="fr"):
@@ -56,23 +55,28 @@ class Card(models.Model):
     def __str__(self):
         return self.name
 
-FACES_CHOICES = [
+SIDES_CHOICES = [
     ("front", "front"),
     ("back", "back"),
 ]
-class Image(models.Model):
-    #Demander aux djangiste comment faire default=self.card.name
+class Face(models.Model):
     name = models.CharField(max_length=500, default="")
+    side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
+    type_line = models.CharField(max_length=500, default="")
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='faces', null=True)
+    oracle_text = models.CharField(max_length=10000, default="")
+
+class Image(models.Model):
     image = models.ImageField(upload_to="cards_images", blank=True, null=True)
     extension = models.CharField(max_length=10, default="")
     url = models.URLField(default="")
     bluriness = models.FloatField(default=0.0)
     size = models.IntegerField(default=0)
-    face = models.CharField(max_length=5, choices=FACES_CHOICES, default="front")  
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, null=True)
+    face = models.ForeignKey(Face, on_delete=models.CASCADE, related_name='images', null=True)
+    
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['card','extension','face'], name='unique_face_extension'),
+            models.UniqueConstraint(fields=['face', 'extension'], name='unique_face_extension'),
         ]
 
     def getsize(self):

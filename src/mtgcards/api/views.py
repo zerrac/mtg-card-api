@@ -1,4 +1,6 @@
 # Create your views here.
+from django_filters import rest_framework as filters
+from django.db.models import Q, Count
 from mtgcards.api.models import Card
 from mtgcards.api.models import Image
 from rest_framework.response import Response
@@ -11,6 +13,26 @@ import requests
 
 import os
 
+class CardFilter(filters.FilterSet):
+    face_number = filters.NumberFilter(label="nombre de faces", method="face_number_filter")
+    has_back = filters.BooleanFilter(label="A un dos", method="has_back_filter")
+
+    class Meta:
+        model = Card
+        fields = "__all__"
+
+    def face_number_filter(self, queryset, name, value):
+        queryset = Card.objects.annotate(num_faces=Count('faces')).filter(num_faces=value)
+        return queryset
+
+    def has_back_filter(self, queryset, name, value):
+        if value:
+            queryset = Card.objects.filter(faces__side="back")
+        else:
+            queryset = Card.objects.exclude(faces__side="back")
+        return queryset
+        
+
 
 class CardViewSet(viewsets.ModelViewSet):
     """
@@ -20,7 +42,8 @@ class CardViewSet(viewsets.ModelViewSet):
     queryset = Card.objects.all().order_by("name")
     serializer_class = CardSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class = CardFilter
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]

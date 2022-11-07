@@ -1,5 +1,6 @@
 gunicorn
 django
+django-filter
 djangorestframework
 requests
 psycopg2-binary

@@ -7,6 +7,7 @@ import functools
 from django.core.management.base import BaseCommand, CommandError
 import mtgcards.api.utils.scryfall as scryfall
 from mtgcards.api.models import Card
+from mtgcards.api.models import Face
 from mtgcards.api.models import Image
 
 
@@ -32,41 +33,61 @@ class Command(BaseCommand):
 
         def create_cards(cards):
             cards_models = []
+            faces_models = []
             images_models = []
             for card in cards:
                 try:
+
                     card_model = Card(
                         name=card["name"],
                         collector_number=card["collector_number"],
                         edition=card["set"],
                         scryfall_id=card["id"],
-                        scryfall_oracle_id=card["oracle_id"],
+                        oracle_id=scryfall.get_face_oracle(card),
                         scryfall_api_url=card["uri"],
                         image_status=card["image_status"],
                         frame=card["frame"],
-                        type_line=scryfall.get_face_type(card),
                         lang=card["lang"],
                         full_art=card["full_art"],
                     )
-                    cards_models.append(card_model)
-                    images_models.append(
-                        Image(
-                            card=card_model,
-                            url=scryfall.get_face_url(card, "normal"),
-                            extension="jpg",
-                        )
-                    )
-                    images_models.append(
-                        Image(
-                            card=card_model,
-                            url=scryfall.get_face_url(card, "png"),
-                            extension="png",
-                        ),
-                    )
+                    if card["image_status"] != "missing":
+                        cards_models.append(card_model)     
+                            
+                        i=0
+                        for face_name in card["name"].split(' // '):
+                            if card['layout'] in ['modal_dfc', 'double_faced_token', 'art_series'] and i==1:
+                                side="back"
+                            else:
+                                side="front"
+                            i+=1
+                            face_model = Face(
+                                name=face_name,
+                                card=card_model,
+                                side=side,
+                                type_line=scryfall.get_face_type(card, face_name=face_name),
+                                oracle_text=scryfall._get_face_data(card, "oracle_text", face_name=face_name)
+                            )
+                            faces_models.append(face_model)
+                            
+                            images_models.append(
+                                Image(
+                                    url=scryfall.get_face_url(card, face_name=face_name, type="normal"),
+                                    extension="jpg",
+                                    face=face_model,
+                                )
+                            )
+                            images_models.append(
+                                Image(
+                                    url=scryfall.get_face_url(card, face_name=face_name, type="png"),
+                                    extension="png",
+                                    face=face_model,
+                                ),
+                            )
                 except:
                     print(card["uri"])
                     raise
             Card.objects.bulk_create(objs=cards_models)
+            Face.objects.bulk_create(objs=faces_models)
             Image.objects.bulk_create(objs=images_models)
 
         buf_size = 655360
