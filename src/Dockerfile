@@ -4,7 +4,7 @@ RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 RUN python -m pip install --upgrade pip
 
-FROM build-base AS build
+FROM build-base AS final
 
 WORKDIR /code
 COPY requirements.txt requirements.txt
