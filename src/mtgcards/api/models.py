@@ -69,7 +69,7 @@ class Image(models.Model):
     bluriness = models.FloatField(default=0.0)
     size = models.IntegerField(default=0)
     face = models.CharField(max_length=5, choices=FACES_CHOICES, default="front")  
-    card = models.ForeignKey(Card, on_delete=models.CASCADE)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, null=True)
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['card','extension','face'], name='unique_face_extension'),
