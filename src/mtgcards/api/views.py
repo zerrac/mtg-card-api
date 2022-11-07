@@ -73,13 +73,13 @@ class CardApiView(APIView):
         ).exclude(image_status="placeholder")
 
         if len(prints) == 0:
-            prints = Card.objects.filter(name=card).exclude(image_status="placeholder")
+            prints = Card.objects.filter(faces__name=card).exclude(image_status="placeholder")
         if len(prints) == 0:
             return Response({"Card named %s not found in database" % card})
 
         selected_print = self.select_best_candidate(prints, preferred_lang)
 
-        face = Face.objects.filter(card=selected_print, side="front")[0]
+        face = Face.objects.get(card=selected_print, name=request.GET["name"])
         image = Image.objects.get(face=face, extension=image_format)
 
         if not image.image:
@@ -87,7 +87,7 @@ class CardApiView(APIView):
 
         if image.bluriness < 200 and preferred_lang != "en":
             selected_print = self.select_best_candidate(prints, preferred_lang)
-            face = Face.objects.filter(card=selected_print, side="front")[0]
+            face = Face.objects.get(card=selected_print, name=request.GET["name"])
             image = Image.objects.get(face=face, extension=image_format)
             if not image.image:
                 image.download()

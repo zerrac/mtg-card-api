@@ -55,7 +55,7 @@ class Command(BaseCommand):
                             
                         i=0
                         for face_name in card["name"].split(' // '):
-                            if card['layout'] in ['modal_dfc', 'double_faced_token', 'art_series'] and i==1:
+                            if not "image_uris" in card and i==1:
                                 side="back"
                             else:
                                 side="front"
