@@ -69,7 +69,7 @@ class CardApiView(APIView):
             image_format = "jpg"
 
         prints = Card.objects.filter(
-            name=request.GET["name"], lang=preferred_lang
+            faces__name=request.GET["name"], lang=preferred_lang
         ).exclude(image_status="placeholder")
 
         if len(prints) == 0:
