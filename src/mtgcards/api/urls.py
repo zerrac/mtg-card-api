@@ -6,7 +6,7 @@ router = routers.DefaultRouter()
 router.register(r"cards", views.CardViewSet)
 
 urlpatterns =   [
-    path('', views.cHomePageView.as_view()),
+    path('', views.HomePageView.as_view()),
     path("cards/", views.CardApiView.as_view()),
     path("api/", include(router.urls)),
 ]
