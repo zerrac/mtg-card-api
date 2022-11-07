@@ -2,8 +2,7 @@
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
 from django.views.generic import TemplateView
-from mtgcards.api.models import Card
-from mtgcards.api.models import Image
+from mtgcards.api.models import Card, Image, Face
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import authentication, permissions
@@ -16,6 +15,7 @@ import os
 
 class HomePageView(TemplateView):
     template_name = "home.html"
+
 class CardFilter(filters.FilterSet):
     face_number = filters.NumberFilter(label="nombre de faces", method="face_number_filter")
     has_back = filters.BooleanFilter(label="A un dos", method="has_back_filter")
@@ -79,15 +79,16 @@ class CardApiView(APIView):
 
         selected_print = self.select_best_candidate(prints, preferred_lang)
 
-        image = Image.objects.get(card=selected_print, extension=image_format)
+        face = Face.objects.filter(card=selected_print, side="front")[0]
+        image = Image.objects.get(face=face, extension=image_format)
 
         if not image.image:
             image.download()
 
         if image.bluriness < 200 and preferred_lang != "en":
             selected_print = self.select_best_candidate(prints, preferred_lang)
-            image = Image.objects.get(card=selected_print, extension=image_format)
-
+            face = Face.objects.filter(card=selected_print, side="front")[0]
+            image = Image.objects.get(face=face, extension=image_format)
             if not image.image:
                 image.download()
 
@@ -111,7 +112,8 @@ class CardApiView(APIView):
             print_score = print.evaluate_score(preferred_lang)
             if print_score > best_score:
                 selected_print = print
-                selected_image = Image.objects.filter(card=print, extension=extension)
+                selected_face = Face.objects.filter(card=selected_print, side="front")[0]
+                selected_image = Image.objects.get(face=selected_face, extension=extension)
                 best_score = print_score
-                selected_print_content_length = selected_image[0].getsize()
+                selected_print_content_length = selected_image.getsize()
         return selected_print

@@ -36,7 +36,7 @@ class Card(models.Model):
         if self.collector_number.isnumeric():
             score += 80
 
-        if self.type_line.lower().startswith("basic land") and self.full_art:
+        if self.faces.filter(side="front")[0].type_line.lower().startswith("basic land") and self.full_art:
             score += 50
 
         if self.frame == "2015":
@@ -89,7 +89,7 @@ class Image(models.Model):
         re = requests.get(self.url, stream=True)
         re.raise_for_status()
         re.raw.decode_content = True
-        self.image = File(re.raw, name=self.card.name + "." + self.extension)
+        self.image = File(re.raw, name=self.face.name + "." + self.extension)
         self.save()
         self.bluriness = images.measure_blurriness(self.image.path)
         self.save()
