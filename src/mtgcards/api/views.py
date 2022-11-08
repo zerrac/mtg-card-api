@@ -91,18 +91,19 @@ class CardApiView(APIView):
         return response
 
     def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg"):
-        best_score = 0
+        best_score = -1
         for face in faces:
-            if not face.images.get(extension=extension).image:
-                face.images.get(extension=extension).download()
+            face_image = face.images.get(extension=extension)
+            if not face_image.image:
+                face_image.download()
 
             card_score = face.card.evaluate_score(preferred_lang)
             if card_score > best_score:
                 selected_face = face
-                selected_image = selected_face.images.get(extension=extension)
+                selected_image = face_image
                 best_score = card_score
             elif card_score == best_score:
-                if face.images.get(extension=extension).bluriness > selected_face.images.get(extension=extension).bluriness:
+                if face_image.bluriness > selected_image.bluriness:
                     selected_face = face
                     best_score = card_score
                 
