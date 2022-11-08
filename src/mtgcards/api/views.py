@@ -58,69 +58,52 @@ class CardApiView(APIView):
         else:
             preferred_lang = "en"
 
-        if "name" in request.GET:
-            card = request.GET["name"]
+        if "face_name" in request.GET:
+            face_name = request.GET["face_name"]
         else:
-            return Response({"error": "missing name parameter"})
+            return Response({"error": "face_name parameter is mandatory"})
 
         if "format" in request.GET:
             image_format = request.GET["format"]
         else:
             image_format = "jpg"
 
-        prints = Card.objects.filter(
-            faces__name=request.GET["name"]
-        ).exclude(image_status__in = ["placeholder", "missing"])
+        faces = Face.objects.filter(
+            name=face_name
+        ).exclude(card__image_status__in = ["placeholder", "missing"]).order_by("card")
 
-        if len(prints) == 0:
-            return Response({"Card named %s not found in database" % card})
+        if len(faces) == 0:
+            return Response({"Face named %s not found in database" % face_name})
 
-        localized_prints = prints.filter(lang=preferred_lang)
-        if len(localized_prints) == 0:
-            selected_print = self.select_best_candidate(prints, preferred_lang)
-        else:
-            selected_print = self.select_best_candidate(localized_prints, preferred_lang)
+        selected_face = self.select_best_candidate(faces, preferred_lang=preferred_lang, extension=image_format)
 
-        face = Face.objects.get(card=selected_print, name=request.GET["name"])
-        image = Image.objects.get(face=face, extension=image_format)
-
-
-        if image.bluriness < 200 and preferred_lang != "en":
-            selected_print = self.select_best_candidate(prints, preferred_lang)
-            face = Face.objects.get(card=selected_print, name=request.GET["name"])
-            image = Image.objects.get(face=face, extension=image_format)
-            if not image.image:
-                image.download()
+        image = selected_face.images.get(extension=image_format)
+        if not image.image:
+            image.download()
 
         if "debug" in request.GET:
             response = Response(
-                CardSerializer(selected_print, context={"request": request}).data
+                CardSerializer(selected_face.card, context={"request": request}).data
             )
         else:
             response = Response(status=302)
             response["location"] = request.build_absolute_uri(image.image.url)
         return response
 
-    def select_best_candidate(self, prints, preferred_lang="fr", extension="jpg"):
-
+    def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg"):
         best_score = 0
-        best_content_length = 0
-        for print in prints:
-            if print.image_status == "placeholder" and len(prints) > 1:
-                continue
+        for face in faces:
+            if not face.images.get(extension=extension).image:
+                face.images.get(extension=extension).download()
 
-            if not print.faces.filter(side="front")[0].images.get(extension=extension).image:
-                print.faces.filter(side="front")[0].images.get(extension=extension).download()
-
-            print_score = print.evaluate_score(preferred_lang)
-            if print_score > best_score:
-                selected_print = print
-                selected_face = Face.objects.filter(card=selected_print, side="front")[0]
-                selected_image = Image.objects.get(face=selected_face, extension=extension)
-                best_score = print_score
-            elif print_score == best_score:
-                if print.faces.filter(side="front")[0].images.get(extension=extension).bluriness > selected_print.faces.filter(side="front")[0].images.get(extension=extension).bluriness:
-                    selected_print = print
+            card_score = face.card.evaluate_score(preferred_lang)
+            if card_score > best_score:
+                selected_face = face
+                selected_image = selected_face.images.get(extension=extension)
+                best_score = card_score
+            elif card_score == best_score:
+                if face.images.get(extension=extension).bluriness > selected_face.images.get(extension=extension).bluriness:
+                    selected_face = face
+                    best_score = card_score
                 
-                
-        return selected_print
+        return selected_face

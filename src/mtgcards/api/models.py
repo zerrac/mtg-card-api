@@ -39,16 +39,16 @@ class Card(models.Model):
         # if self.faces.filter(side="front")[0].type_line.lower().startswith("basic land") and self.full_art:
         #     score += 50
 
-        # if self.frame == "2015":
-        #     score += 40
+        if self.frame == "2015":
+            score += 100
 
         # if self.edition != "sld":
         #     score += 10
 
         # if self.image_status == "highres_scan":
         #     score += 2
-        elif self.image_status == "lowres":
-            score += 1
+        # elif self.image_status == "lowres":
+        #     score += 1
 
         return score
 
