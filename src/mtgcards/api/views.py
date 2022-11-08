@@ -69,21 +69,21 @@ class CardApiView(APIView):
             image_format = "jpg"
 
         prints = Card.objects.filter(
-            faces__name=request.GET["name"], lang=preferred_lang
-        ).exclude(image_status="placeholder")
+            faces__name=request.GET["name"]
+        ).exclude(image_status__in = ["placeholder", "missing"])
 
-        if len(prints) == 0:
-            prints = Card.objects.filter(faces__name=card).exclude(image_status="placeholder")
         if len(prints) == 0:
             return Response({"Card named %s not found in database" % card})
 
-        selected_print = self.select_best_candidate(prints, preferred_lang)
+        localized_prints = prints.filter(lang=preferred_lang)
+        if len(localized_prints) == 0:
+            selected_print = self.select_best_candidate(prints, preferred_lang)
+        else:
+            selected_print = self.select_best_candidate(localized_prints, preferred_lang)
 
         face = Face.objects.get(card=selected_print, name=request.GET["name"])
         image = Image.objects.get(face=face, extension=image_format)
 
-        if not image.image:
-            image.download()
 
         if image.bluriness < 200 and preferred_lang != "en":
             selected_print = self.select_best_candidate(prints, preferred_lang)
@@ -109,11 +109,18 @@ class CardApiView(APIView):
             if print.image_status == "placeholder" and len(prints) > 1:
                 continue
 
+            if not print.faces.filter(side="front")[0].images.get(extension=extension).image:
+                print.faces.filter(side="front")[0].images.get(extension=extension).download()
+
             print_score = print.evaluate_score(preferred_lang)
             if print_score > best_score:
                 selected_print = print
                 selected_face = Face.objects.filter(card=selected_print, side="front")[0]
                 selected_image = Image.objects.get(face=selected_face, extension=extension)
                 best_score = print_score
-                selected_print_content_length = selected_image.getsize()
+            elif print_score == best_score:
+                if print.faces.filter(side="front")[0].images.get(extension=extension).bluriness > selected_print.faces.filter(side="front")[0].images.get(extension=extension).bluriness:
+                    selected_print = print
+                
+                
         return selected_print
