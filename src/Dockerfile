@@ -1,14 +1,15 @@
-FROM python:3.7-slim AS build-base
+FROM python:3.7-slim
 
-RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get update && apt-get install -y \
+    install \
+    ffmpeg \
+    libsm6  \
+    libxext6  \
+    && rm -rf /var/lib/apt/lists/*
 RUN python -m pip install --upgrade pip
-
-FROM build-base AS final
 
 WORKDIR /code
 COPY requirements.txt requirements.txt
 RUN python -m pip install -r requirements.txt
-
 
 COPY . .
