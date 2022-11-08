@@ -146,6 +146,8 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 SENTRY_DSN = os.getenv("SENTRY_DSN", None)
 if SENTRY_DSN:
     sentry_sdk.init(
