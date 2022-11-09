@@ -2,13 +2,15 @@
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
 from django.views.generic import TemplateView
-from .models import Card, Image, Face
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import authentication, permissions
+
+from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
-from rest_framework.views import APIView
+from . import BLURINESS_HIGH_TRESHOLD
 import requests
 
 import os
@@ -108,6 +110,10 @@ class CardApiView(APIView):
                     selected_image.download()
                 if face_image.bluriness > selected_image.bluriness:
                     selected_face = face
+                    selected_image = face_image
                     best_score = card_score
+            if selected_face.card.lang == preferred_lang and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD:
+            # We found a picture in preferred_lang and a high enough bluriness level, we select it
+                break
                 
         return selected_face
