@@ -1,7 +1,6 @@
 FROM python:3.7-slim
 
 RUN apt-get update && apt-get install -y \
-    install \
     ffmpeg \
     libsm6  \
     libxext6  \
