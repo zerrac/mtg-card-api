@@ -2,8 +2,8 @@ from django.db import models
 from django.core.files import File
 import requests
 
-import mtgcards.api.utils.images as images
-import mtgcards.api.utils.scryfall as scryfall
+from .utils import images
+from .utils import scryfall
 
 # Create your models here.
 class Card(models.Model):

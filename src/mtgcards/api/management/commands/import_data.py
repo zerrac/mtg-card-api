@@ -5,10 +5,10 @@ import ijson
 import functools
 
 from django.core.management.base import BaseCommand, CommandError
-import mtgcards.api.utils.scryfall as scryfall
-from mtgcards.api.models import Card
-from mtgcards.api.models import Face
-from mtgcards.api.models import Image
+from .utils import scryfall
+from .models import Card
+from .models import Face
+from .models import Image
 
 
 class Command(BaseCommand):

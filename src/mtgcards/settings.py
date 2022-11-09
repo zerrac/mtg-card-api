@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "django_filters",
-    "mtgcards.api.apps.ApiConfig",
+    "mtgcards.api",
 ]
 
 MIDDLEWARE = [

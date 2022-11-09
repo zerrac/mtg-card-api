@@ -1,4 +1,4 @@
-from mtgcards.api.models import Card,Face,Image
+from .models import Card,Face,Image
 from rest_framework import serializers
 
 class ImageSerializer(serializers.ModelSerializer):

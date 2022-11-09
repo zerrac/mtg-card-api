@@ -2,12 +2,12 @@
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
 from django.views.generic import TemplateView
-from mtgcards.api.models import Card, Image, Face
+from .models import Card, Image, Face
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import authentication, permissions
 from urllib.request import urlopen
-from mtgcards.api.serializers import CardSerializer
+from .serializers import CardSerializer
 from rest_framework.views import APIView
 import requests
 
