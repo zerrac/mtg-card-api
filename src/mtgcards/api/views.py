@@ -69,7 +69,8 @@ class CardApiView(APIView):
             image_format = "jpg"
 
         faces = Face.objects.filter(
-            name=face_name
+            name=face_name,
+            card__lang__in=[preferred_lang, "en"]
         ).exclude(card__image_status__in = ["placeholder", "missing"]).order_by("card")
 
         if len(faces) == 0:
@@ -94,15 +95,17 @@ class CardApiView(APIView):
         best_score = -1
         for face in faces:
             face_image = face.images.get(extension=extension)
-            if not face_image.image:
-                face_image.download()
 
             card_score = face.card.evaluate_score(preferred_lang)
             if card_score > best_score:
+                if not face_image.image:
+                    face_image.download()
                 selected_face = face
                 selected_image = face_image
                 best_score = card_score
             elif card_score == best_score:
+                if not face_image.image:
+                    face_image.download()
                 if face_image.bluriness > selected_image.bluriness:
                     selected_face = face
                     best_score = card_score
