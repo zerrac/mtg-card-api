@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.files import File
-import requests
+import urllib.request
 
 from .utils import images
 from .utils import scryfall
@@ -86,10 +86,16 @@ class Image(models.Model):
         return self.size
 
     def download(self):
-        re = requests.get(self.url, stream=True)
-        re.raise_for_status()
-        re.raw.decode_content = True
-        self.image = File(re.raw, name=self.face.name + "." + self.extension)
+        req = urllib.request.Request(
+            self.url,
+            data=None,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
+            },
+        )
+        f = urllib.request.urlopen(req)
+
+        self.image = File(f, name=self.face.name + "." + self.extension)
         self.save()
         self.bluriness = images.measure_blurriness(self.image.path)
         self.save()
