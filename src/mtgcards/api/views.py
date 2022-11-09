@@ -61,7 +61,7 @@ class CardApiView(APIView):
         if "face_name" in request.GET:
             face_name = request.GET["face_name"]
         else:
-            return Response({"error": "face_name parameter is mandatory"})
+            return Response({"error": "face_name parameter is mandatory"}, status=400)
 
         if "format" in request.GET:
             image_format = request.GET["format"]
@@ -73,7 +73,7 @@ class CardApiView(APIView):
         ).exclude(card__image_status__in = ["placeholder", "missing"]).order_by("card")
 
         if len(faces) == 0:
-            return Response({"Face named %s not found in database" % face_name})
+            return Response({"Face named %s not found in database" % face_name}, status=404)
 
         selected_face = self.select_best_candidate(faces, preferred_lang=preferred_lang, extension=image_format)
 
