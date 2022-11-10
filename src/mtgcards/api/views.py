@@ -90,12 +90,15 @@ class CardApiView(APIView):
         selected_face, selected_image = self.select_best_candidate(
             faces, preferred_lang=preferred_lang, extension=image_format
         )
+        if not selected_image.image:
+            selected_image.download()
+
         if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_lang != 'en':
             faces = faces.exclude(card__lang__in=preferred_lang)
             selected_face, selected_image = self.select_best_candidate(
                 faces, preferred_lang='en', extension=image_format
             )
-
+            
         if not selected_image.image:
             selected_image.download()
 
