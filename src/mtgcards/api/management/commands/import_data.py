@@ -74,30 +74,30 @@ def create_or_update_cards(cards):
             print(card["uri"])
             raise
 
-    # Card.objects.bulk_create(
-    #     objs=cards_models,
-    #     batch_size=1000,
-    #     # ignore_conflicts=False,
-    #     # update_conflicts=True,
-    #     # update_fields=list(card_data.keys()),
-    #     # unique_fields=["scryfall_id"],
-    # )
-    # Face.objects.bulk_create(
-    #     objs=faces_models,
-    #     batch_size=1000,
-    #     # ignore_conflicts=False,
-    #     # update_conflicts=True,
-    #     # update_fields=list(face_data.keys()),
-    #     # unique_fields=["name", "card"],
-    # )
-    # Image.objects.bulk_create(
-    #     objs=images_models,
-    #     batch_size=1000,
-    #     # ignore_conflicts=False,
-    #     # update_conflicts=True,
-    #     # update_fields=list(image_data.keys()),
-    #     # unique_fields=["face", "extension"],
-    # )
+    Card.objects.bulk_create(
+        objs=cards_models,
+        batch_size=1000,
+        # ignore_conflicts=False,
+        # update_conflicts=True,
+        # update_fields=list(card_data.keys()),
+        # unique_fields=["scryfall_id"],
+    )
+    Face.objects.bulk_create(
+        objs=faces_models,
+        batch_size=1000,
+        # ignore_conflicts=False,
+        # update_conflicts=True,
+        # update_fields=list(face_data.keys()),
+        # unique_fields=["name", "card"],
+    )
+    Image.objects.bulk_create(
+        objs=images_models,
+        batch_size=1000,
+        # ignore_conflicts=False,
+        # update_conflicts=True,
+        # update_fields=list(image_data.keys()),
+        # unique_fields=["face", "extension"],
+    )
 
 class Command(BaseCommand):
     help = "import card bulk-data from scryfall"
