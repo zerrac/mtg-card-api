@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "django_filters",
-    "bulk_update_or_create",
     "mtgcards.api",
 ]
 
