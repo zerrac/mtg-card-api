@@ -69,13 +69,16 @@ def get_bulk_url(database_type="all_cards"):
 def get_face_url(card, face_name=None, type="png"):
     return _get_face_data(card, field="image_uris", face_name=face_name)[type]
 
+
 def get_face_oracle(card):
     return _get_face_data(card, field="oracle_id", face_name=None)
+
 
 def get_face_type(card, face_name=None):
     return _get_face_data(card, field="type_line", face_name=face_name)
 
-def _get_face_data(card, field ,face_name=None):
+
+def _get_face_data(card, field, face_name=None):
     if field in card:
         return card[field]
     elif "card_faces" in card:

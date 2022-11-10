@@ -6,16 +6,16 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0004_auto_20221107_1910'),
+        ("api", "0004_auto_20221107_1910"),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='face',
-            name='unique_card_side',
+            model_name="face",
+            name="unique_card_side",
         ),
         migrations.RemoveField(
-            model_name='face',
-            name='side',
+            model_name="face",
+            name="side",
         ),
     ]

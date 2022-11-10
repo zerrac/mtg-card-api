@@ -6,22 +6,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0006_auto_20221107_2045'),
+        ("api", "0006_auto_20221107_2045"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='face',
-            name='oracle_id',
+            model_name="face",
+            name="oracle_id",
         ),
         migrations.AddField(
-            model_name='card',
-            name='oracle_id',
-            field=models.CharField(default='', max_length=100),
+            model_name="card",
+            name="oracle_id",
+            field=models.CharField(default="", max_length=100),
         ),
         migrations.AddField(
-            model_name='face',
-            name='oracle_text',
-            field=models.CharField(default='', max_length=1000),
+            model_name="face",
+            name="oracle_text",
+            field=models.CharField(default="", max_length=1000),
         ),
     ]

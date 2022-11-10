@@ -15,11 +15,15 @@ import requests
 
 import os
 
+
 class HomePageView(TemplateView):
     template_name = "home.html"
 
+
 class CardFilter(filters.FilterSet):
-    face_number = filters.NumberFilter(label="nombre de faces", method="face_number_filter")
+    face_number = filters.NumberFilter(
+        label="nombre de faces", method="face_number_filter"
+    )
     has_back = filters.BooleanFilter(label="A un dos", method="has_back_filter")
 
     class Meta:
@@ -27,7 +31,9 @@ class CardFilter(filters.FilterSet):
         fields = "__all__"
 
     def face_number_filter(self, queryset, name, value):
-        queryset = Card.objects.annotate(num_faces=Count('faces')).filter(num_faces=value)
+        queryset = Card.objects.annotate(num_faces=Count("faces")).filter(
+            num_faces=value
+        )
         return queryset
 
     def has_back_filter(self, queryset, name, value):
@@ -36,7 +42,6 @@ class CardFilter(filters.FilterSet):
         else:
             queryset = Card.objects.exclude(faces__side="back")
         return queryset
-        
 
 
 class CardViewSet(viewsets.ModelViewSet):
@@ -49,6 +54,7 @@ class CardViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = CardFilter
+
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -70,15 +76,20 @@ class CardApiView(APIView):
         else:
             image_format = "jpg"
 
-        faces = Face.objects.filter(
-            name=face_name,
-            card__lang__in=[preferred_lang, "en"]
-        ).exclude(card__image_status__in = ["placeholder", "missing"]).order_by("card")
+        faces = (
+            Face.objects.filter(name=face_name, card__lang__in=[preferred_lang, "en"])
+            .exclude(card__image_status__in=["placeholder", "missing"])
+            .order_by("card")
+        )
 
         if len(faces) == 0:
-            return Response({"Face named %s not found in database" % face_name}, status=404)
+            return Response(
+                {"Face named %s not found in database" % face_name}, status=404
+            )
 
-        selected_face = self.select_best_candidate(faces, preferred_lang=preferred_lang, extension=image_format)
+        selected_face = self.select_best_candidate(
+            faces, preferred_lang=preferred_lang, extension=image_format
+        )
 
         image = selected_face.images.get(extension=image_format)
         if not image.image:
@@ -112,8 +123,11 @@ class CardApiView(APIView):
                     selected_face = face
                     selected_image = face_image
                     best_score = card_score
-            if selected_face.card.lang == preferred_lang and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD:
-            # We found a picture in preferred_lang and a high enough bluriness level, we select it
+            if (
+                selected_face.card.lang == preferred_lang
+                and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD
+            ):
+                # We found a picture in preferred_lang and a high enough bluriness level, we select it
                 break
-                
+
         return selected_face

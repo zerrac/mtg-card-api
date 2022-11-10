@@ -20,12 +20,16 @@ class Card(models.Model):
     frame = models.CharField(max_length=10, default="")
     lang = models.CharField(max_length=10, default="")
     full_art = models.BooleanField(default=False)
-    
+
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["name", "edition", "collector_number", "lang"], name='unique_card_print'),
+            models.UniqueConstraint(
+                fields=["name", "edition", "collector_number", "lang"],
+                name="unique_card_print",
+            ),
+            models.UniqueConstraint(fields=["scryfall_id"], name="unique_scryfall_id"),
         ]
-        
+
     def evaluate_score(self, preferred_lang="fr"):
         score = 0
         if self.lang == preferred_lang:
@@ -63,7 +67,9 @@ class Face(models.Model):
     name = models.CharField(max_length=500, default="")
     side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
     type_line = models.CharField(max_length=500, default="")
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='faces', null=True)
+    card = models.ForeignKey(
+        Card, on_delete=models.CASCADE, related_name="faces", null=True
+    )
     oracle_text = models.CharField(max_length=10000, default="")
 
 class Image(models.Model):
@@ -72,11 +78,15 @@ class Image(models.Model):
     url = models.URLField(default="")
     bluriness = models.FloatField(default=0.0)
     size = models.IntegerField(default=0)
-    face = models.ForeignKey(Face, on_delete=models.CASCADE, related_name='images', null=True)
-    
+    face = models.ForeignKey(
+        Face, on_delete=models.CASCADE, related_name="images", null=True
+    )
+
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['face', 'extension'], name='unique_face_extension'),
+            models.UniqueConstraint(
+                fields=["face", "extension"], name="unique_face_extension"
+            ),
         ]
 
     def getsize(self):

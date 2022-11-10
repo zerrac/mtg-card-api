@@ -6,30 +6,36 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0001_initial'),
+        ("api", "0001_initial"),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='image',
-            name='unique_png_card',
+            model_name="image",
+            name="unique_png_card",
         ),
         migrations.RemoveConstraint(
-            model_name='image',
-            name='unique_jpg_card',
+            model_name="image",
+            name="unique_jpg_card",
         ),
         migrations.AddField(
-            model_name='image',
-            name='face',
-            field=models.CharField(choices=[('front', 'front'), ('back', 'back')], default='front', max_length=5),
+            model_name="image",
+            name="face",
+            field=models.CharField(
+                choices=[("front", "front"), ("back", "back")],
+                default="front",
+                max_length=5,
+            ),
         ),
         migrations.AddField(
-            model_name='image',
-            name='name',
-            field=models.CharField(default='', max_length=500),
+            model_name="image",
+            name="name",
+            field=models.CharField(default="", max_length=500),
         ),
         migrations.AddConstraint(
-            model_name='image',
-            constraint=models.UniqueConstraint(fields=('card', 'extension', 'face'), name='unique_face_extension'),
+            model_name="image",
+            constraint=models.UniqueConstraint(
+                fields=("card", "extension", "face"), name="unique_face_extension"
+            ),
         ),
     ]

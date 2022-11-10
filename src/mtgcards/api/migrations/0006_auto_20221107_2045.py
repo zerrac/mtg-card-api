@@ -7,23 +7,37 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0005_auto_20221107_1920'),
+        ("api", "0005_auto_20221107_1920"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='face',
-            name='side',
-            field=models.CharField(choices=[('front', 'front'), ('back', 'back')], default='front', max_length=5),
+            model_name="face",
+            name="side",
+            field=models.CharField(
+                choices=[("front", "front"), ("back", "back")],
+                default="front",
+                max_length=5,
+            ),
         ),
         migrations.AlterField(
-            model_name='face',
-            name='card',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='faces', to='api.card'),
+            model_name="face",
+            name="card",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="faces",
+                to="api.card",
+            ),
         ),
         migrations.AlterField(
-            model_name='image',
-            name='face',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='images', to='api.face'),
+            model_name="image",
+            name="face",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="images",
+                to="api.face",
+            ),
         ),
     ]

@@ -8,49 +8,86 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Card',
+            name="Card",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=500)),
-                ('collector_number', models.CharField(max_length=10)),
-                ('edition', models.CharField(max_length=10)),
-                ('scryfall_id', models.CharField(default='', max_length=100)),
-                ('scryfall_oracle_id', models.CharField(default='', max_length=100)),
-                ('scryfall_api_url', models.URLField(default='')),
-                ('image_status', models.CharField(default='', max_length=100)),
-                ('frame', models.CharField(default='', max_length=10)),
-                ('type_line', models.CharField(default='', max_length=500)),
-                ('lang', models.CharField(default='', max_length=10)),
-                ('full_art', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=500)),
+                ("collector_number", models.CharField(max_length=10)),
+                ("edition", models.CharField(max_length=10)),
+                ("scryfall_id", models.CharField(default="", max_length=100)),
+                ("scryfall_oracle_id", models.CharField(default="", max_length=100)),
+                ("scryfall_api_url", models.URLField(default="")),
+                ("image_status", models.CharField(default="", max_length=100)),
+                ("frame", models.CharField(default="", max_length=10)),
+                ("type_line", models.CharField(default="", max_length=500)),
+                ("lang", models.CharField(default="", max_length=10)),
+                ("full_art", models.BooleanField(default=False)),
             ],
         ),
         migrations.CreateModel(
-            name='Image',
+            name="Image",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('image', models.ImageField(blank=True, null=True, upload_to='cards_images')),
-                ('extension', models.CharField(default='', max_length=10)),
-                ('url', models.URLField(default='')),
-                ('bluriness', models.FloatField(default=0.0)),
-                ('size', models.IntegerField(default=0)),
-                ('card', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='api.card')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "image",
+                    models.ImageField(blank=True, null=True, upload_to="cards_images"),
+                ),
+                ("extension", models.CharField(default="", max_length=10)),
+                ("url", models.URLField(default="")),
+                ("bluriness", models.FloatField(default=0.0)),
+                ("size", models.IntegerField(default=0)),
+                (
+                    "card",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="api.card",
+                    ),
+                ),
             ],
         ),
         migrations.AddConstraint(
-            model_name='card',
-            constraint=models.UniqueConstraint(fields=('name', 'edition', 'collector_number', 'lang'), name='unique_card_print'),
+            model_name="card",
+            constraint=models.UniqueConstraint(
+                fields=("name", "edition", "collector_number", "lang"),
+                name="unique_card_print",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='image',
-            constraint=models.UniqueConstraint(condition=models.Q(('extension', 'png')), fields=('card',), name='unique_png_card'),
+            model_name="image",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("extension", "png")),
+                fields=("card",),
+                name="unique_png_card",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='image',
-            constraint=models.UniqueConstraint(condition=models.Q(('extension', 'jpg')), fields=('card',), name='unique_jpg_card'),
+            model_name="image",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("extension", "jpg")),
+                fields=("card",),
+                name="unique_jpg_card",
+            ),
         ),
     ]

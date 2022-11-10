@@ -7,56 +7,79 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0003_alter_image_card'),
+        ("api", "0003_alter_image_card"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Face',
+            name="Face",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(default='', max_length=500)),
-                ('side', models.CharField(choices=[('front', 'front'), ('back', 'back')], default='front', max_length=5)),
-                ('type_line', models.CharField(default='', max_length=500)),
-                ('oracle_id', models.CharField(default='', max_length=100)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(default="", max_length=500)),
+                (
+                    "side",
+                    models.CharField(
+                        choices=[("front", "front"), ("back", "back")],
+                        default="front",
+                        max_length=5,
+                    ),
+                ),
+                ("type_line", models.CharField(default="", max_length=500)),
+                ("oracle_id", models.CharField(default="", max_length=100)),
             ],
         ),
         migrations.RemoveConstraint(
-            model_name='image',
-            name='unique_face_extension',
+            model_name="image",
+            name="unique_face_extension",
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='scryfall_oracle_id',
+            model_name="card",
+            name="scryfall_oracle_id",
         ),
         migrations.RemoveField(
-            model_name='card',
-            name='type_line',
+            model_name="card",
+            name="type_line",
         ),
         migrations.RemoveField(
-            model_name='image',
-            name='card',
+            model_name="image",
+            name="card",
         ),
         migrations.RemoveField(
-            model_name='image',
-            name='name',
+            model_name="image",
+            name="name",
         ),
         migrations.AddConstraint(
-            model_name='image',
-            constraint=models.UniqueConstraint(fields=('face', 'extension'), name='unique_face_extension'),
+            model_name="image",
+            constraint=models.UniqueConstraint(
+                fields=("face", "extension"), name="unique_face_extension"
+            ),
         ),
         migrations.AddField(
-            model_name='face',
-            name='card',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='api.card'),
+            model_name="face",
+            name="card",
+            field=models.ForeignKey(
+                null=True, on_delete=django.db.models.deletion.CASCADE, to="api.card"
+            ),
         ),
         migrations.AlterField(
-            model_name='image',
-            name='face',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='api.face'),
+            model_name="image",
+            name="face",
+            field=models.ForeignKey(
+                null=True, on_delete=django.db.models.deletion.CASCADE, to="api.face"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='face',
-            constraint=models.UniqueConstraint(fields=('card', 'side'), name='unique_card_side'),
+            model_name="face",
+            constraint=models.UniqueConstraint(
+                fields=("card", "side"), name="unique_card_side"
+            ),
         ),
     ]
