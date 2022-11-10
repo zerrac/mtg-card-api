@@ -71,11 +71,11 @@ class CardApiView(APIView):
         else:
             return Response({"error": "face_name parameter is mandatory"}, status=400)
 
-        if "format" in request.GET:
-            image_format = request.GET["format"]
+        if "image_format" in request.GET:
+            image_format = request.GET["image_format"]
         else:
             image_format = "jpg"
-
+        
         faces = (
             Face.objects.filter(name=face_name, card__lang__in=[preferred_lang, "en"])
             .exclude(card__image_status__in=["placeholder", "missing"])
@@ -87,13 +87,12 @@ class CardApiView(APIView):
                 {"Face named %s not found in database" % face_name}, status=404
             )
 
-        selected_face = self.select_best_candidate(
+        selected_face, selected_image = self.select_best_candidate(
             faces, preferred_lang=preferred_lang, extension=image_format
         )
 
-        image = selected_face.images.get(extension=image_format)
-        if not image.image:
-            image.download()
+        if not selected_image.image:
+            selected_image.download()
 
         if "debug" in request.GET:
             response = Response(
@@ -101,7 +100,7 @@ class CardApiView(APIView):
             )
         else:
             response = Response(status=302)
-            response["location"] = request.build_absolute_uri(image.image.url)
+            response["location"] = request.build_absolute_uri(selected_image.image.url)
         return response
 
     def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg"):
@@ -130,4 +129,4 @@ class CardApiView(APIView):
                 # We found a picture in preferred_lang and a high enough bluriness level, we select it
                 break
 
-        return selected_face
+        return selected_face, selected_image
