@@ -116,9 +116,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # Image.objects.all().delete()
-        # Face.objects.all().delete()
-        # Card.objects.all().delete()
+        Image.objects.all().delete()
+        Face.objects.all().delete()
+        Card.objects.all().delete()
 
         buf_size = 655360
         if options["online"]:
