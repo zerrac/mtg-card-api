@@ -44,7 +44,7 @@ class Card(models.Model):
         #     score += 50
 
         if self.frame == "2015":
-            score += 100
+            score += 50
 
         if self.edition != "sld":
             score += 10
