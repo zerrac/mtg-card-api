@@ -95,10 +95,16 @@ class CardApiView(APIView):
             faces = faces.filter(card__oracle_id = oracle_id)
         if face_name:
             faces = faces.filter(name = face_name)
+        if "preferred_set" in request.GET:
+            faces = faces.filter(card__edition = request.GET["preferred_set"])
+        if "preferred_number" in request.GET:
+            faces = faces.filter(collector_number = request.GET["preferred_number"])
+        
+
 
         if len(faces) == 0:
             return Response(
-                {"Face named %s not found in database" % face_name}, status=404
+                {"Face named %s with given filters not found in database" % face_name}, status=404
             )
 
         selected_face, selected_image = self.select_best_candidate(
