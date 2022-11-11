@@ -61,26 +61,40 @@ class CardApiView(APIView):
 
     def get(self, request, format=None):
 
+        
         if "lang" in request.GET:
             preferred_lang = request.GET["lang"]
         else:
             preferred_lang = "en"
 
-        if "face_name" in request.GET:
-            face_name = request.GET["face_name"]
-        else:
-            return Response({"error": "face_name parameter is mandatory"}, status=400)
 
         if "image_format" in request.GET:
             image_format = request.GET["image_format"]
         else:
             image_format = "jpg"
         
+        if "face_name" in request.GET:
+            face_name = request.GET["face_name"]
+        else:
+            face_name = None
+
+        if "oracle_id" in request.GET:
+            oracle_id = request.GET["oracle_id"]
+        else:
+            oracle_id = None
+        
+        if (not oracle_id and not face_name ):
+            return Response({"error": "You must specify 'face_name' or 'oracle_id'"}, status=400)
+        
         faces = (
-            Face.objects.filter(name=face_name, card__lang__in=[preferred_lang, "en"])
+            Face.objects.filter(card__lang__in=[preferred_lang, "en"])
             .exclude(card__image_status__in=["placeholder", "missing"])
             .order_by("card")
         )
+        if oracle_id:
+            faces = faces.filter(card__oracle_id = oracle_id)
+        if face_name:
+            faces = faces.filter(name = face_name)
 
         if len(faces) == 0:
             return Response(
