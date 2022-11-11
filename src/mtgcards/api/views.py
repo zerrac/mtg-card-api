@@ -67,7 +67,6 @@ class CardApiView(APIView):
         else:
             preferred_lang = "en"
 
-
         if "image_format" in request.GET:
             image_format = request.GET["image_format"]
         else:
@@ -82,24 +81,40 @@ class CardApiView(APIView):
             oracle_id = request.GET["oracle_id"]
         else:
             oracle_id = None
-        
-        if (not oracle_id and not face_name ):
+
+        if "preferred_set" in request.GET:
+            preferred_set = request.GET["preferred_set"]
+        else:
+            preferred_set = None
+            
+        if "preferred_number" in request.GET:
+            preferred_number = request.GET["preferred_number"]
+        else:
+            preferred_number = None
+
+
+        if (not oracle_id and not face_name):
             return Response({"error": "You must specify 'face_name' or 'oracle_id'"}, status=400)
         
+
         faces = (
-            Face.objects.filter(card__lang__in=[preferred_lang, "en"])
+            Face.objects.filter()
             .exclude(card__image_status__in=["placeholder", "missing"])
             .order_by("card")
         )
+
         if oracle_id:
             faces = faces.filter(card__oracle_id = oracle_id)
         if face_name:
             faces = faces.filter(name__iexact = face_name)
-            
-        if "preferred_set" in request.GET:
-            faces = faces.filter(card__edition__iexact = request.GET["preferred_set"])
-        if "preferred_number" in request.GET:
-            faces = faces.filter(card__collector_number__iexact = request.GET["preferred_number"])
+        
+        if not preferred_set and not preferred_number:
+            faces = faces.filter(card__lang__in=[preferred_lang, "en"])
+        else:
+            if preferred_set:
+                faces = faces.filter(card__edition__iexact = preferred_set)
+            if preferred_number:
+                faces = faces.filter(card__collector_number__iexact = preferred_number)
         
 
 
