@@ -94,11 +94,12 @@ class CardApiView(APIView):
         if oracle_id:
             faces = faces.filter(card__oracle_id = oracle_id)
         if face_name:
-            faces = faces.filter(name = face_name)
+            faces = faces.filter(name__iexact = face_name)
+            
         if "preferred_set" in request.GET:
-            faces = faces.filter(card__edition = request.GET["preferred_set"])
+            faces = faces.filter(card__edition__iexact = request.GET["preferred_set"])
         if "preferred_number" in request.GET:
-            faces = faces.filter(collector_number = request.GET["preferred_number"])
+            faces = faces.filter(card__collector_number__iexact = request.GET["preferred_number"])
         
 
 
