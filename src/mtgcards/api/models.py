@@ -46,8 +46,8 @@ class Card(models.Model):
         if self.frame == "2015":
             score += 100
 
-        # if self.edition != "sld":
-        #     score += 10
+        if self.edition != "sld":
+            score += 10
 
         # if self.image_status == "highres_scan":
         #     score += 2
