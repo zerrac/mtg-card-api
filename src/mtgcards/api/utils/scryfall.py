@@ -65,6 +65,8 @@ def get_bulk_url(database_type="all_cards"):
             break
     return online_db["download_uri"], online_db["compressed_size"]
 
+def get_migrations():
+    return get_data(SCRYFALL_URL + "/migrations")
 
 def get_face_url(card, face_name=None, type="png"):
     return _get_face_data(card, field="image_uris", face_name=face_name)[type]

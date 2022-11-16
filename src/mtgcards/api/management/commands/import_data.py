@@ -12,15 +12,12 @@ from ...models import Face
 from ...models import Image
 
 
-def create_or_update_cards(cards):
+def create_cards(cards):
     cards_models = []
     faces_models = []
     images_models = []
     for card in cards:
         try:
-            if card["image_status"] == "missing":
-                continue
-
             card_data = {
                 "scryfall_id": card["id"],
                 "name": card["name"],
@@ -56,20 +53,21 @@ def create_or_update_cards(cards):
                 face_model = Face(**face_data)
                 faces_models.append(face_model)
 
-                image_data = {
-                    "url": scryfall.get_face_url(
-                        card, face_name=face_name, type="normal"
-                    ),
-                    "extension": "jpg",
-                    "face": face_model,
-                }
-                images_models.append(Image(**image_data))
-                image_data = {
-                    "url": scryfall.get_face_url(card, face_name=face_name, type="png"),
-                    "extension": "png",
-                    "face": face_model,
-                }
-                images_models.append(Image(**image_data))
+                if not card["image_status"] in ["missing","placeholder"]:
+                    image_data = {
+                        "url": scryfall.get_face_url(
+                            card, face_name=face_name, type="normal"
+                        ),
+                        "extension": "jpg",
+                        "face": face_model,
+                    }
+                    images_models.append(Image(**image_data))
+                    image_data = {
+                        "url": scryfall.get_face_url(card, face_name=face_name, type="png"),
+                        "extension": "png",
+                        "face": face_model,
+                    }
+                    images_models.append(Image(**image_data))
         except:
             print(card["uri"])
             raise
@@ -77,26 +75,14 @@ def create_or_update_cards(cards):
     Card.objects.bulk_create(
         objs=cards_models,
         batch_size=1000,
-        # ignore_conflicts=False,
-        # update_conflicts=True,
-        # update_fields=list(card_data.keys()),
-        # unique_fields=["scryfall_id"],
     )
     Face.objects.bulk_create(
         objs=faces_models,
         batch_size=1000,
-        # ignore_conflicts=False,
-        # update_conflicts=True,
-        # update_fields=list(face_data.keys()),
-        # unique_fields=["name", "card"],
     )
     Image.objects.bulk_create(
         objs=images_models,
         batch_size=1000,
-        # ignore_conflicts=False,
-        # update_conflicts=True,
-        # update_fields=list(image_data.keys()),
-        # unique_fields=["face", "extension"],
     )
 
 class Command(BaseCommand):
@@ -116,11 +102,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        Image.objects.all().delete()
-        Face.objects.all().delete()
-        Card.objects.all().delete()
-
-        buf_size = 655360
         if options["online"]:
             bulk_url, bulk_size = scryfall.get_bulk_url()
             req = urllib.request.Request(
@@ -141,7 +122,10 @@ class Command(BaseCommand):
                 "import must either be online or you must specify a local bulk file"
             )
 
+        buf_size = 655360
+        existing_scryfall_id = set([card.scryfall_id for card in Card.objects.all()])
         cards = ijson.sendable_list()
+        cards_created = 0
         coro = ijson.items_coro(cards, "item")
         with tqdm(
             total=bulk_size,
@@ -151,10 +135,33 @@ class Command(BaseCommand):
         ) as t:
             for chunk in iter(functools.partial(f.read, buf_size), b""):
                 coro.send(chunk)
-                if len(cards) > 500:
-                    create_or_update_cards(cards)
+                if len(cards)>800:
+                    # create cards by batch of 800 during bulk file reading
+                    to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+                    cards_created += len(to_create)
+                    create_cards(to_create)
                     del cards[:]
                 t.update(buf_size)
             coro.close()
+        
+        # create the remaining cards
+        to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+        cards_created += len(to_create)
+        create_cards(to_create)
+        
+        
+        
+        if cards_created > 0:
+            self.stdout.write(self.style.SUCCESS('Successfully imported %i new cards.' % cards_created))
+        else:
+            self.stdout.write(self.style.SUCCESS('No new cards to import'))
 
-            create_or_update_cards(cards)
+        cards_deleted = 0
+        for migrations in scryfall.get_migrations():
+            to_delete=Card.objects.filter(scryfall_id=migrations["old_scryfall_id"])
+            cards_deleted += len(to_delete)
+            to_delete.delete()
+        if cards_deleted > 0:
+            self.stdout.write(self.style.SUCCESS('Successfully deleted %i deprecated cards.' % cards_created))
+        else:
+            self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))
