@@ -63,7 +63,13 @@ def get_bulk_url(database_type="all_cards"):
         if database["type"] == database_type:
             online_db = database
             break
-    return online_db["download_uri"], online_db["compressed_size"]
+    if "compressed_size" in online_db:
+        size = online_db["compressed_size"]
+    elif "size" in online_db:
+        size = online_db["size"]
+    else:
+        size = 0
+    return online_db["download_uri"], size
 
 def get_migrations():
     return get_data(SCRYFALL_URL + "/migrations")
