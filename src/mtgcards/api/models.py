@@ -38,13 +38,13 @@ class Card(models.Model):
             score += 100
 
         if self.collector_number.isnumeric():
-            score += 80
+            score += 50
 
         # if self.faces.filter(side="front")[0].type_line.lower().startswith("basic land") and self.full_art:
         #     score += 50
 
-        # if self.frame == "2015":
-        #     score += 50
+        if self.frame.isdigit() and int(self.frame) >= "2003":
+            score += 50
 
         if self.edition != "sld":
             score += 10
