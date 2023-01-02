@@ -37,8 +37,8 @@ class Card(models.Model):
         elif self.lang == "en":
             score += 100
 
-        # if self.collector_number.isnumeric():
-        #     score += 80
+        if self.collector_number.isnumeric():
+            score += 80
 
         # if self.faces.filter(side="front")[0].type_line.lower().startswith("basic land") and self.full_art:
         #     score += 50
