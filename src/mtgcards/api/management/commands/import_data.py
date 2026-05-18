@@ -12,6 +12,31 @@ from ...models import Face
 from ...models import Image
 
 
+def backfill_images(cards, face_lookup):
+    images_models = []
+    for card in cards:
+        if card["image_status"] in ["missing", "placeholder"]:
+            continue
+        for face_name in card["name"].split(" // "):
+            face_id = face_lookup.get((card["id"], face_name))
+            if face_id is None:
+                continue
+            images_models.append(Image(
+                url=scryfall.get_face_url(card, face_name=face_name, type="normal"),
+                extension="jpg",
+                face_id=face_id,
+            ))
+            images_models.append(Image(
+                url=scryfall.get_face_url(card, face_name=face_name, type="png"),
+                extension="png",
+                face_id=face_id,
+            ))
+    if images_models:
+        with transaction.atomic():
+            Image.objects.bulk_create(objs=images_models, batch_size=1000, ignore_conflicts=True)
+    return len(images_models) // 2
+
+
 def create_cards(cards):
     cards_models = []
     faces_models = []
@@ -36,7 +61,7 @@ def create_cards(cards):
 
             i = 0
             for face_name in card["name"].split(" // "):
-                if not "image_uris" in card and i == 1:
+                if not card.get("image_uris") and i == 1:
                     side = "back"
                 else:
                     side = "front"
@@ -53,7 +78,7 @@ def create_cards(cards):
                 face_model = Face(**face_data)
                 faces_models.append(face_model)
 
-                if not card["image_status"] in ["missing","placeholder"] and "image_uris" in card and i == 1:
+                if not card["image_status"] in ["missing","placeholder"]:
                     image_data = {
                         "url": scryfall.get_face_url(
                             card, face_name=face_name, type="normal"
@@ -138,8 +163,22 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))
 
         existing_scryfall_id = set([card.scryfall_id for card in Card.objects.all()])
+
+        # Build lookup for faces that need images backfilled (existing cards, no images yet)
+        faces_without_images = (
+            Face.objects.filter(images__isnull=True)
+            .exclude(card__image_status__in=["missing", "placeholder"])
+            .select_related("card")
+        )
+        needs_images_scryfall_id = set()
+        face_lookup = {}
+        for face in faces_without_images:
+            needs_images_scryfall_id.add(face.card.scryfall_id)
+            face_lookup[(face.card.scryfall_id, face.name)] = face.id
+
         cards = ijson.sendable_list()
         cards_created = 0
+        images_backfilled = 0
         coro = ijson.items_coro(cards, "item")
         with tqdm(
             total=bulk_size,
@@ -151,7 +190,9 @@ class Command(BaseCommand):
                 coro.send(chunk)
                 if len(cards)>800:
                     to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+                    to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
                     cards_created += len(to_create)
+                    images_backfilled += backfill_images(to_backfill, face_lookup)
                     create_cards(to_create)
                     del cards[:]
                 t.update(buf_size)
@@ -159,10 +200,16 @@ class Command(BaseCommand):
 
         # create the remaining cards
         to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+        to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
         cards_created += len(to_create)
+        images_backfilled += backfill_images(to_backfill, face_lookup)
         create_cards(to_create)
 
         if cards_created > 0:
             self.stdout.write(self.style.SUCCESS('Successfully imported %i new cards.' % cards_created))
         else:
             self.stdout.write(self.style.SUCCESS('No new cards to import'))
+        if images_backfilled > 0:
+            self.stdout.write(self.style.SUCCESS('Backfilled images for %i faces.' % images_backfilled))
+        else:
+            self.stdout.write(self.style.SUCCESS('No images to backfill.'))

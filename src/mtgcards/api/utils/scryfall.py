@@ -98,7 +98,7 @@ def get_face_type(card, face_name=None):
 
 
 def _get_face_data(card, field, face_name=None):
-    if field in card:
+    if field in card and card[field] is not None:
         return card[field]
     elif "card_faces" in card:
         if face_name != None:
