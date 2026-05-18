@@ -72,9 +72,15 @@ class CardViewSet(viewsets.ModelViewSet):
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    # renderer_classes = [JSONRenderer, ImageRenderer]
-    
-    
+
+    @staticmethod
+    def _client_wants_image_only(request):
+        """Returns True if Accept header restricts exclusively to image/* types."""
+        accept = request.META.get('HTTP_ACCEPT', '*/*')
+        parts = [p.strip().split(';')[0].strip() for p in accept.split(',')]
+        non_wildcard = [p for p in parts if p and p != '*/*']
+        return bool(non_wildcard) and all(p.startswith('image/') for p in non_wildcard)
+
     def get(self, request, format=None):
         preferred_lang = request.GET.get("preferred_lang", "en")
         image_format = request.GET.get("image_format", "png")
@@ -125,14 +131,13 @@ class CardApiView(APIView):
                 faces, "en", image_format, None, None
             )
 
-        if "debug" in request.GET:
-            response = Response(
+        if "debug" in request.GET and not self._client_wants_image_only(request):
+            return Response(
                 CardSerializer(selected_face.card, context={"request": request}).data
             )
-        else:
-            response = Response(status=302)
-            response["location"] = request.build_absolute_uri(selected_image.image.url)
-        return response
+
+        content_type = "image/jpeg" if image_format == "jpg" else "image/png"
+        return FileResponse(selected_image.image.open('rb'), content_type=content_type)
 
     def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
         face, image = self.select_best_candidate(
