@@ -28,6 +28,13 @@ rate_limiter = Throttle()
 SCRYFALL_URL = "https://api.scryfall.com"
 
 http = requests.Session()
+
+# Set User-Agent
+http.headers.update({
+    "User-Agent": "mtg-card-api/1.0",
+    "Accept": "*/*"
+})
+
 retries = Retry(total=5, status_forcelist=[429, 500, 502, 503, 504])
 
 http.mount("http://", HTTPAdapter(max_retries=retries))
@@ -75,8 +82,10 @@ def get_migrations():
     return get_data(SCRYFALL_URL + "/migrations")
 
 def get_face_url(card, face_name=None, type="png"):
-    return _get_face_data(card, field="image_uris", face_name=face_name)[type]
-
+    try:
+        return _get_face_data(card, field="image_uris", face_name=face_name)[type]
+    except:
+        breakpoint()
 
 def get_face_oracle(card):
     return _get_face_data(card, field="oracle_id", face_name=None)
@@ -92,7 +101,7 @@ def _get_face_data(card, field, face_name=None):
     elif "card_faces" in card:
         if face_name != None:
             for card_face in card["card_faces"]:
-                if card_face["name"] == face_name:
+                if face_name.lower() in card_face["name"].lower():
                     return card_face[field]
         else:
             return card["card_faces"][0][field]

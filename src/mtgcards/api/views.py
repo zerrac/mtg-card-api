@@ -16,6 +16,19 @@ import requests
 import os
 
 
+from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRenderer
+from rest_framework.response import Response
+from django.http import FileResponse
+class ImageRenderer(BaseRenderer):
+    media_type = "image/*"
+    format = "image"
+    render_style = "binary"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        # data must be raw image bytes
+        return data
+    
+
 class HomePageView(TemplateView):
     template_name = "home.html"
 
@@ -58,44 +71,20 @@ class CardViewSet(viewsets.ModelViewSet):
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
+    # renderer_classes = [JSONRenderer, ImageRenderer]
+    
+    
     def get(self, request, format=None):
+        preferred_lang = request.GET.get("preferred_lang", "en")
+        image_format = request.GET.get("image_format", "png")
+        face_name = request.GET.get("face_name")
+        oracle_id = request.GET.get("oracle_id")
+        scryfall_id = request.GET.get("scryfall_id")
+        preferred_set = request.GET.get("preferred_set")
+        preferred_number = request.GET.get("preferred_number")
 
-        
-        if "lang" in request.GET:
-            preferred_lang = request.GET["lang"]
-        else:
-            preferred_lang = "en"
-
-        if "image_format" in request.GET:
-            image_format = request.GET["image_format"]
-        else:
-            image_format = "jpg"
-        
-        if "face_name" in request.GET:
-            face_name = request.GET["face_name"]
-        else:
-            face_name = None
-
-        if "oracle_id" in request.GET:
-            oracle_id = request.GET["oracle_id"]
-        else:
-            oracle_id = None
-
-        if "preferred_set" in request.GET:
-            preferred_set = request.GET["preferred_set"]
-        else:
-            preferred_set = None
-            
-        if "preferred_number" in request.GET:
-            preferred_number = request.GET["preferred_number"]
-        else:
-            preferred_number = None
-
-
-        if (not oracle_id and not face_name):
-            return Response({"error": "You must specify 'face_name' or 'oracle_id'"}, status=400)
-        
+        if not oracle_id and not face_name and not scryfall_id:
+            return Response({"error": "You must specify 'face_name', 'oracle_id' or 'scryfall_id'"}, status=400)
 
         faces = (
             Face.objects.filter()
@@ -104,39 +93,36 @@ class CardApiView(APIView):
         )
 
         if oracle_id:
-            faces = faces.filter(card__oracle_id = oracle_id)
+            faces = faces.filter(card__oracle_id=oracle_id)
+        if scryfall_id:
+            faces = faces.filter(card__oracle_id=oracle_id)
         if face_name:
-            faces = faces.filter(name__iexact = face_name)
-        
-        if not preferred_set and not preferred_number:
-            faces = faces.filter(card__lang__in=[preferred_lang, "en"])
-        else:
-            if preferred_set:
-                faces = faces.filter(card__edition__iexact = preferred_set)
-            if preferred_number:
-                faces = faces.filter(card__collector_number__iexact = preferred_number)
-        
+            faces = faces.filter(name__iexact=face_name)
 
-
-        if len(faces) == 0:
+        if not faces.exists():
             return Response(
-                {"Face named %s with given filters not found in database" % face_name}, status=404
+                {"error": "Face named %s with given filters not found in database" % face_name},
+                status=404,
             )
 
-        selected_face, selected_image = self.select_best_candidate(
-            faces, preferred_lang=preferred_lang, extension=image_format
+        selected_face, selected_image = self._select_with_download(
+            faces, preferred_lang, image_format, preferred_number, preferred_set
         )
-        if not selected_image.image:
-            selected_image.download()
 
-        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_lang != 'en':
-            faces = faces.exclude(card__lang__in=preferred_lang)
-            selected_face, selected_image = self.select_best_candidate(
-                faces, preferred_lang='en', extension=image_format
+        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_number:
+            selected_face, selected_image = self._select_with_download(
+                faces, preferred_lang, image_format, None, preferred_set
             )
-            
-        if not selected_image.image:
-            selected_image.download()
+
+        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_set:
+            selected_face, selected_image = self._select_with_download(
+                faces, preferred_lang, image_format, None, None
+            )
+
+        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_lang != "en":
+            selected_face, selected_image = self._select_with_download(
+                faces, "en", image_format, None, None
+            )
 
         if "debug" in request.GET:
             response = Response(
@@ -147,12 +133,28 @@ class CardApiView(APIView):
             response["location"] = request.build_absolute_uri(selected_image.image.url)
         return response
 
-    def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg"):
+    def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
+        face, image = self.select_best_candidate(
+            faces,
+            preferred_lang=preferred_lang,
+            extension=extension,
+            preferred_number=preferred_number,
+            preferred_set=preferred_set,
+        )
+        if not image.image:
+            image.download()
+        return face, image
+
+    def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg", preferred_number=None, preferred_set=None):
         best_score = -1
         for face in faces:
-            face_image = face.images.get(extension=extension)
+            face_image = face.images.filter(extension=extension).first()
 
-            card_score = face.card.evaluate_score(preferred_lang)
+            if not face_image:
+                continue
+            card_score = face.card.evaluate_score(
+                preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set
+            )
             if card_score > best_score:
                 selected_face = face
                 selected_image = face_image
@@ -170,7 +172,6 @@ class CardApiView(APIView):
                 selected_face.card.lang == preferred_lang
                 and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD
             ):
-                # We found a picture in preferred_lang and a high enough bluriness level, we select it
+                # Found a high-quality card in the preferred language — no need to keep looking
                 break
-
         return selected_face, selected_image

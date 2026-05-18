@@ -30,7 +30,7 @@ class Card(models.Model):
             models.UniqueConstraint(fields=["scryfall_id"], name="unique_scryfall_id"),
         ]
 
-    def evaluate_score(self, preferred_lang="fr"):
+    def evaluate_score(self, preferred_lang="fr", preferred_number=None, preferred_set=None):
         score = 0
         if self.lang == preferred_lang:
             score += 200
@@ -49,10 +49,20 @@ class Card(models.Model):
         if self.edition != "sld":
             score += 10
 
+        # Nobody likes tle
+        if self.edition == 'tle':
+            score -= 100
+
         # if self.image_status == "highres_scan":
         #     score += 2
         # elif self.image_status == "lowres":
         #     score += 1
+
+        if preferred_set and self.edition.lower() == preferred_set.lower():
+            score += 1500
+
+        if preferred_number and self.collector_number.lower() == preferred_number.lower():
+            score += 3000
 
         return score
 

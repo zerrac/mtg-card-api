@@ -53,7 +53,7 @@ def create_cards(cards):
                 face_model = Face(**face_data)
                 faces_models.append(face_model)
 
-                if not card["image_status"] in ["missing","placeholder"]:
+                if not card["image_status"] in ["missing","placeholder"] and "image_uris" in card and i == 1:
                     image_data = {
                         "url": scryfall.get_face_url(
                             card, face_name=face_name, type="normal"
