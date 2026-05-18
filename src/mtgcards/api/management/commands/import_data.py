@@ -3,7 +3,7 @@ from tqdm import tqdm
 import urllib.request
 import ijson
 import functools
-from django.db import models
+from django.db import models, transaction
 
 from django.core.management.base import BaseCommand, CommandError
 from ...utils import scryfall
@@ -72,18 +72,19 @@ def create_cards(cards):
             print(card["uri"])
             raise
 
-    Card.objects.bulk_create(
-        objs=cards_models,
-        batch_size=1000,
-    )
-    Face.objects.bulk_create(
-        objs=faces_models,
-        batch_size=1000,
-    )
-    Image.objects.bulk_create(
-        objs=images_models,
-        batch_size=1000,
-    )
+    with transaction.atomic():
+        Card.objects.bulk_create(
+            objs=cards_models,
+            batch_size=1000,
+        )
+        Face.objects.bulk_create(
+            objs=faces_models,
+            batch_size=1000,
+        )
+        Image.objects.bulk_create(
+            objs=images_models,
+            batch_size=1000,
+        )
 
 class Command(BaseCommand):
     help = "import card bulk-data from scryfall"
@@ -123,6 +124,19 @@ class Command(BaseCommand):
             )
 
         buf_size = 655360
+
+        # Delete deprecated cards first so their IDs are not in existing_scryfall_id,
+        # allowing the bulk file to re-import any card whose ID was reused or re-added.
+        cards_deleted = 0
+        for migration in scryfall.get_migrations():
+            to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
+            cards_deleted += len(to_delete)
+            to_delete.delete()
+        if cards_deleted > 0:
+            self.stdout.write(self.style.SUCCESS('Successfully deleted %i deprecated cards.' % cards_deleted))
+        else:
+            self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))
+
         existing_scryfall_id = set([card.scryfall_id for card in Card.objects.all()])
         cards = ijson.sendable_list()
         cards_created = 0
@@ -136,32 +150,19 @@ class Command(BaseCommand):
             for chunk in iter(functools.partial(f.read, buf_size), b""):
                 coro.send(chunk)
                 if len(cards)>800:
-                    # create cards by batch of 800 during bulk file reading
                     to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
                     cards_created += len(to_create)
                     create_cards(to_create)
                     del cards[:]
                 t.update(buf_size)
             coro.close()
-        
+
         # create the remaining cards
         to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
         cards_created += len(to_create)
         create_cards(to_create)
-        
-        
-        
+
         if cards_created > 0:
             self.stdout.write(self.style.SUCCESS('Successfully imported %i new cards.' % cards_created))
         else:
             self.stdout.write(self.style.SUCCESS('No new cards to import'))
-
-        cards_deleted = 0
-        for migrations in scryfall.get_migrations():
-            to_delete=Card.objects.filter(scryfall_id=migrations["old_scryfall_id"])
-            cards_deleted += len(to_delete)
-            to_delete.delete()
-        if cards_deleted > 0:
-            self.stdout.write(self.style.SUCCESS('Successfully deleted %i deprecated cards.' % cards_created))
-        else:
-            self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))

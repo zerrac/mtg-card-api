@@ -2,6 +2,7 @@
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
 from django.views.generic import TemplateView
+from mtgcards.api.utils import scryfall
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets
@@ -95,7 +96,7 @@ class CardApiView(APIView):
         if oracle_id:
             faces = faces.filter(card__oracle_id=oracle_id)
         if scryfall_id:
-            faces = faces.filter(card__oracle_id=oracle_id)
+            faces = faces.filter(card__scryfall_id=scryfall_id)
         if face_name:
             faces = faces.filter(name__iexact=face_name)
 

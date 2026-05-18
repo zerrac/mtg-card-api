@@ -84,8 +84,10 @@ def get_migrations():
 def get_face_url(card, face_name=None, type="png"):
     try:
         return _get_face_data(card, field="image_uris", face_name=face_name)[type]
-    except:
-        breakpoint()
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not get image URL for card {card.get('uri', '?')} face={face_name} type={type}"
+        ) from e
 
 def get_face_oracle(card):
     return _get_face_data(card, field="oracle_id", face_name=None)
