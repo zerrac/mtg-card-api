@@ -72,14 +72,7 @@ class CardViewSet(viewsets.ModelViewSet):
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    @staticmethod
-    def _client_wants_image_only(request):
-        """Returns True if Accept header restricts exclusively to image/* types."""
-        accept = request.META.get('HTTP_ACCEPT', '*/*')
-        parts = [p.strip().split(';')[0].strip() for p in accept.split(',')]
-        non_wildcard = [p for p in parts if p and p != '*/*']
-        return bool(non_wildcard) and all(p.startswith('image/') for p in non_wildcard)
+    renderer_classes = [JSONRenderer, BrowsableAPIRenderer,ImageRenderer]
 
     def get(self, request, format=None):
         preferred_lang = request.GET.get("preferred_lang", "en")
@@ -89,12 +82,16 @@ class CardApiView(APIView):
         scryfall_id = request.GET.get("scryfall_id")
         preferred_set = request.GET.get("preferred_set")
         preferred_number = request.GET.get("preferred_number")
+        side = request.GET.get("side", "front")
 
         if not oracle_id and not face_name and not scryfall_id:
             return Response({"error": "You must specify 'face_name', 'oracle_id' or 'scryfall_id'"}, status=400)
 
+        if side not in ("front", "back"):
+            return Response({"error": "'side' must be 'front' or 'back'"}, status=400)
+
         faces = (
-            Face.objects.filter()
+            Face.objects.filter(side=side)
             .exclude(card__image_status__in=["placeholder", "missing"])
             .order_by("card")
         )
@@ -131,10 +128,8 @@ class CardApiView(APIView):
                 faces, "en", image_format, None, None
             )
 
-        if "debug" in request.GET and not self._client_wants_image_only(request):
-            return Response(
-                CardSerializer(selected_face.card, context={"request": request}).data
-            )
+        if "debug" in request.GET:
+            return Response(CardSerializer(selected_face.card, context={"request": request}).data)
 
         content_type = "image/jpeg" if image_format == "jpg" else "image/png"
         return FileResponse(selected_image.image.open('rb'), content_type=content_type)
