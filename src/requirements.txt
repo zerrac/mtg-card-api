@@ -11,3 +11,4 @@ ijson
 tqdm
 sentry-sdk
 drf-spectacular
+whitenoise

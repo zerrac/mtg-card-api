@@ -1,0 +1,18 @@
+# Run `fly apps create mtg-card-api` then set secrets before first deploy:
+#   flyctl secrets set DJANGO_SECRET_KEY=<your-secret>
+#   flyctl secrets set ALLOWED_HOSTS=mtg-card-api.fly.dev,your-domain.com
+
+app = "mtg-card-api"
+primary_region = "cdg"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
