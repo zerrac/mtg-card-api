@@ -17,6 +17,7 @@ COPY src/ .
 ARG DJANGO_SECRET_KEY=build-time-placeholder
 ENV DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 
+ARG BUILD_DATE=unknown
 RUN python manage.py collectstatic --no-input && \
     python manage.py migrate && \
     python manage.py import_data --online
