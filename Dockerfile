@@ -24,4 +24,5 @@ RUN python manage.py collectstatic --no-input && \
 
 CMD ["gunicorn", "mtgcards.wsgi:application", \
      "--worker-class", "gevent", "-w", "1", "-b", ":8000", \
+     "--timeout", "120", \
      "--access-logfile", "-", "--error-logfile", "-"]
