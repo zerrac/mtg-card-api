@@ -19,6 +19,7 @@ class Card(models.Model):
     image_status = models.CharField(max_length=100, default="")
     frame = models.CharField(max_length=10, default="")
     lang = models.CharField(max_length=10, default="")
+    layout = models.CharField(max_length=50, default="")
     full_art = models.BooleanField(default=False)
 
     class Meta:
@@ -50,7 +51,7 @@ class Card(models.Model):
             score += 10
 
         # Nobody likes tle
-        if self.edition == 'tle':
+        if self.edition in ['tle', 'fca', 'prm', 'mar'] and not preferred_set:
             score -= 100
 
         # if self.image_status == "highres_scan":
@@ -101,7 +102,7 @@ class Image(models.Model):
 
     def getsize(self):
         if self.size == 0:
-            self.size == scryfall.image_getsize(self.url)
+            self.size = scryfall.image_getsize(self.url)
             self.save()
         return self.size
 

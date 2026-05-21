@@ -54,6 +54,7 @@ def create_cards(cards):
                 "frame": card["frame"],
                 "lang": card["lang"],
                 "full_art": card["full_art"],
+                "layout": card.get("layout", ""),
             }
 
             card_model = Card(**card_data)

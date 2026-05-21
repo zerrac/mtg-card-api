@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework import authentication, permissions
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.types import OpenApiTypes
 
 from .models import Card, Image, Face
 from urllib.request import urlopen
@@ -72,8 +74,40 @@ class CardViewSet(viewsets.ModelViewSet):
 
 class CardApiView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    renderer_classes = [JSONRenderer, BrowsableAPIRenderer,ImageRenderer]
+    renderer_classes = [JSONRenderer, BrowsableAPIRenderer, ImageRenderer]
 
+    @extend_schema(
+        summary="Get best card image",
+        description=(
+            "Returns the best available card image for the given card identifier. "
+            "Scoring weighs language preference (+200 preferred lang, +100 English), "
+            "numeric collector number (+50), frame era ≥ 2003 (+50), with set-specific "
+            "penalties (tle −100, sld −10). Ties are broken by image sharpness "
+            "(Laplacian variance; higher = sharper). "
+            "When `preferred_set` or `preferred_number` is provided the language filter "
+            "is skipped. On blurry results the selection falls back: preferred_number → "
+            "preferred_set → any set → English."
+        ),
+        parameters=[
+            OpenApiParameter("oracle_id", OpenApiTypes.UUID, description="Scryfall oracle ID (mutually exclusive with face_name/scryfall_id)"),
+            OpenApiParameter("face_name", OpenApiTypes.STR, description="Card face name, case-insensitive (mutually exclusive with oracle_id/scryfall_id)"),
+            OpenApiParameter("scryfall_id", OpenApiTypes.UUID, description="Scryfall card ID (mutually exclusive with oracle_id/face_name)"),
+            OpenApiParameter("preferred_lang", OpenApiTypes.STR, default="en", description="ISO 639-1 language code for preferred print (e.g. fr, de, ja). Skipped when preferred_set or preferred_number is set."),
+            OpenApiParameter("image_format", OpenApiTypes.STR, enum=["png", "jpg"], default="png", description="Image format to return"),
+            OpenApiParameter("side", OpenApiTypes.STR, enum=["front", "back"], default="front", description="Card face side"),
+            OpenApiParameter("preferred_set", OpenApiTypes.STR, description="Preferred set code (e.g. lea, m21). Overrides language filter."),
+            OpenApiParameter("preferred_number", OpenApiTypes.STR, description="Preferred collector number within the set. Overrides language filter."),
+            OpenApiParameter("strict_set", OpenApiTypes.BOOL, required=False, description="When present, restrict results to preferred_set only (no fallback). Requires preferred_set."),
+            OpenApiParameter("strict_number", OpenApiTypes.BOOL, required=False, description="When present, restrict results to preferred_number only (no fallback). Requires preferred_number."),
+            OpenApiParameter("min_bluriness", OpenApiTypes.FLOAT, required=False, description=f"Minimum bluriness (Laplacian variance) threshold for fallback logic. Defaults to {BLURINESS_LOW_TRESHOLD}."),
+            OpenApiParameter("debug", OpenApiTypes.BOOL, required=False, description="When present, return card JSON instead of the image binary."),
+        ],
+        responses={
+            200: OpenApiResponse(description="Raw image binary (image/png or image/jpeg), or card JSON when ?debug is set"),
+            400: OpenApiResponse(description="Missing or invalid query parameters"),
+            404: OpenApiResponse(description="No matching card face found"),
+        },
+    )
     def get(self, request, format=None):
         preferred_lang = request.GET.get("preferred_lang", "en")
         image_format = request.GET.get("image_format", "png")
@@ -83,6 +117,17 @@ class CardApiView(APIView):
         preferred_set = request.GET.get("preferred_set")
         preferred_number = request.GET.get("preferred_number")
         side = request.GET.get("side", "front")
+        try:
+            min_bluriness = float(request.GET.get("min_bluriness", BLURINESS_LOW_TRESHOLD))
+        except ValueError:
+            return Response({"error": "'min_bluriness' must be a number"}, status=400)
+        strict_set = "strict_set" in request.GET
+        strict_number = "strict_number" in request.GET
+
+        if strict_set and not preferred_set:
+            return Response({"error": "'strict_set' requires 'preferred_set'"}, status=400)
+        if strict_number and not preferred_number:
+            return Response({"error": "'strict_number' requires 'preferred_number'"}, status=400)
 
         if not oracle_id and not face_name and not scryfall_id:
             return Response({"error": "You must specify 'face_name', 'oracle_id' or 'scryfall_id'"}, status=400)
@@ -102,6 +147,16 @@ class CardApiView(APIView):
             faces = faces.filter(card__scryfall_id=scryfall_id)
         if face_name:
             faces = faces.filter(name__iexact=face_name)
+            # For 'prepare' layout cards only the primary (first) face is standalone;
+            # exclude faces where face_name is the secondary name after ' // '.
+            faces = faces.exclude(
+                card__layout='prepare',
+                card__name__iendswith=' // ' + face_name,
+            )
+        if strict_set:
+            faces = faces.filter(card__edition__iexact=preferred_set)
+        if strict_number:
+            faces = faces.filter(card__collector_number__iexact=preferred_number)
 
         if not faces.exists():
             return Response(
@@ -113,17 +168,17 @@ class CardApiView(APIView):
             faces, preferred_lang, image_format, preferred_number, preferred_set
         )
 
-        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_number:
+        if selected_image.bluriness < min_bluriness and preferred_number and not strict_number:
             selected_face, selected_image = self._select_with_download(
                 faces, preferred_lang, image_format, None, preferred_set
             )
 
-        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_set:
+        if selected_image.bluriness < min_bluriness and preferred_set and not strict_set:
             selected_face, selected_image = self._select_with_download(
                 faces, preferred_lang, image_format, None, None
             )
 
-        if selected_image.bluriness < BLURINESS_LOW_TRESHOLD and preferred_lang != "en":
+        if selected_image.bluriness < min_bluriness and preferred_lang != "en":
             selected_face, selected_image = self._select_with_download(
                 faces, "en", image_format, None, None
             )

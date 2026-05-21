@@ -10,3 +10,4 @@ opencv-python
 ijson
 tqdm
 sentry-sdk
+drf-spectacular

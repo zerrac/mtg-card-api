@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+
+  web:
+    build:
+      context: ./src
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py collectstatic --no-input &&
+             python manage.py migrate &&
+             gunicorn mtgcards.wsgi:application --worker-class gevent -w 4 -b :8000 --access-logfile - --error-logfile -"
+    env_file: .env
+    volumes:
+      - django_static:/static/
+      - django_media:/django_media/
+    depends_on:
+      - db
+
+  nginx:
+    build:
+      context: ./nginx
+    restart: unless-stopped
+    volumes:
+      - django_static:/static/
+      - django_media:/django_media/
+    depends_on:
+      - web
+    networks:
+      - default
+      - public-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.mtg-card-api.loadbalancer.server.port=80"
+      - "traefik.http.routers.mtg-card-api.rule=Host(`${PUBLIC_HOST}`)"
+      - "traefik.http.routers.mtg-card-api.middlewares=force-https"
+      - "traefik.http.services.mtg-card-api.loadbalancer.server.scheme=http"
+      - "traefik.docker.network=${TRAEFIK_BRIDGE:-webung_traefik}"
+
+volumes:
+  django_static:
+  django_media:
+
+networks:
+  public-network:
+    name: ${TRAEFIK_BRIDGE:-webung_traefik}
+    external: true

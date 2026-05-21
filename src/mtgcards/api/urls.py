@@ -1,5 +1,6 @@
 from django.urls import include, path
 from rest_framework import routers
+from drf_spectacular.views import SpectacularAPIView
 from mtgcards.api import views
 
 router = routers.DefaultRouter()
@@ -9,4 +10,5 @@ urlpatterns = [
     path("", views.HomePageView.as_view()),
     path("cards/", views.CardApiView.as_view()),
     path("api/", include(router.urls)),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
 ]
