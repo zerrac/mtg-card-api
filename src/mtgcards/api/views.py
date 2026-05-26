@@ -1,6 +1,7 @@
 # Create your views here.
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count, Prefetch
+from django.db.models.functions import Upper
 from django.views.generic import TemplateView
 from mtgcards.api.utils import scryfall
 from rest_framework.views import APIView
@@ -150,7 +151,7 @@ class CardApiView(APIView):
         if scryfall_id:
             faces = faces.filter(card__scryfall_id=scryfall_id)
         if face_name:
-            faces = faces.filter(name__iexact=face_name)
+            faces = faces.annotate(name_upper=Upper('name')).filter(name_upper=face_name.upper())
             # For 'prepare' layout cards only the primary (first) face is standalone;
             # exclude faces where face_name is the secondary name after ' // '.
             faces = faces.exclude(

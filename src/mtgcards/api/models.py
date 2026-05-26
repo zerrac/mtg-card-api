@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.files import File
+from django.db.models.functions import Upper
 from io import BytesIO
 import time
 import logging
@@ -79,13 +80,18 @@ SIDES_CHOICES = [
     ("back", "back"),
 ]
 class Face(models.Model):
-    name = models.CharField(max_length=500, default="", db_index=True)
+    name = models.CharField(max_length=500, default="")
     side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
     type_line = models.CharField(max_length=500, default="")
     card = models.ForeignKey(
         Card, on_delete=models.CASCADE, related_name="faces", null=True
     )
     oracle_text = models.CharField(max_length=10000, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(Upper('name'), name='face_name_upper_idx'),
+        ]
 
 class Image(models.Model):
     image = models.ImageField(upload_to="cards_images", blank=True, null=True)
