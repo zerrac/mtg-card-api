@@ -23,6 +23,6 @@ RUN python manage.py collectstatic --no-input && \
     python manage.py import_data --online
 
 CMD ["gunicorn", "mtgcards.wsgi:application", \
-     "--worker-class", "gevent", "-w", "2", "-b", ":8000", \
+     "--worker-class", "gevent", "-w", "1", "-b", ":8000", \
      "--timeout", "120", \
      "--access-logfile", "-", "--error-logfile", "-"]
