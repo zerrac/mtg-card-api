@@ -190,7 +190,7 @@ class Command(BaseCommand):
             for chunk in iter(functools.partial(f.read, buf_size), b""):
                 coro.send(chunk)
                 if len(cards)>800:
-                    to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+                    to_create = [card for card in cards if not card["id"] in existing_scryfall_id and card.get("layout") != "art_series"]
                     to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
                     cards_created += len(to_create)
                     images_backfilled += backfill_images(to_backfill, face_lookup)
@@ -200,7 +200,7 @@ class Command(BaseCommand):
             coro.close()
 
         # create the remaining cards
-        to_create = [card for card in cards if not card["id"] in existing_scryfall_id]
+        to_create = [card for card in cards if not card["id"] in existing_scryfall_id and card.get("layout") != "art_series"]
         to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
         cards_created += len(to_create)
         images_backfilled += backfill_images(to_backfill, face_lookup)
