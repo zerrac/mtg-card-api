@@ -14,7 +14,7 @@ from drf_spectacular.types import OpenApiTypes
 from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
-from . import BLURINESS_HIGH_TRESHOLD, BLURINESS_LOW_TRESHOLD
+from . import BLURINESS_HIGH_TRESHOLD, BLURINESS_LOW_TRESHOLD, BLURINESS_SCORE_BONUS
 import requests
 
 import os
@@ -164,6 +164,9 @@ class CardApiView(APIView):
                 status=404,
             )
 
+        if not preferred_set and not preferred_number:
+            self._ensure_all_downloaded(faces, preferred_lang, image_format)
+
         selected_face, selected_image = self._select_with_download(
             faces, preferred_lang, image_format, preferred_number, preferred_set
         )
@@ -184,10 +187,55 @@ class CardApiView(APIView):
             )
 
         if "debug" in request.GET:
-            return Response(CardSerializer(selected_face.card, context={"request": request}).data)
+            return Response(self._build_debug_response(
+                faces, preferred_lang, image_format, preferred_number, preferred_set,
+                selected_face, selected_image,
+            ))
 
         content_type = "image/jpeg" if image_format == "jpg" else "image/png"
         return FileResponse(selected_image.image.open('rb'), content_type=content_type)
+
+    def _ensure_all_downloaded(self, faces, preferred_lang, extension):
+        undownloaded = Image.objects.filter(
+            Q(image='') | Q(image__isnull=True),
+            face__in=faces,
+            face__card__lang=preferred_lang,
+            extension=extension,
+        ).select_related('face')
+        for image in undownloaded:
+            try:
+                image.download()
+            except Exception:
+                pass
+
+    def _build_debug_response(self, faces, preferred_lang, extension, preferred_number, preferred_set, selected_face, selected_image):
+        annotated = faces.select_related('card').prefetch_related(
+            Prefetch('images', queryset=Image.objects.filter(extension=extension), to_attr='ext_images')
+        )
+        candidates = []
+        for face in annotated:
+            face_image = face.ext_images[0] if face.ext_images else None
+            card_score = face.card.evaluate_score(
+                preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set
+            )
+            bluriness = face_image.bluriness if face_image else 0.0
+            bluriness_bonus = min(bluriness, BLURINESS_HIGH_TRESHOLD) / BLURINESS_HIGH_TRESHOLD * BLURINESS_SCORE_BONUS
+            candidates.append({
+                "selected": face.pk == selected_face.pk,
+                "name": face.card.name,
+                "edition": face.card.edition,
+                "lang": face.card.lang,
+                "collector_number": face.card.collector_number,
+                "frame": face.card.frame,
+                "image_status": face.card.image_status,
+                "card_score": card_score,
+                "bluriness": round(bluriness, 2),
+                "bluriness_bonus": round(bluriness_bonus, 2),
+                "total_score": round(card_score + bluriness_bonus, 2),
+                "image_downloaded": bool(face_image and face_image.image),
+            })
+        candidates.sort(key=lambda c: c["total_score"], reverse=True)
+        return {"preferred_lang": preferred_lang, "candidates": candidates}
 
     def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
         face, image = self.select_best_candidate(
@@ -218,16 +266,14 @@ class CardApiView(APIView):
             )
             # Sharpness bonus: max 60 pts (capped at BLURINESS_HIGH_TRESHOLD) so it can
             # override frame/numeric-era ties (±50 pts) but not language preference (100-200 pts).
-            bluriness_bonus = min(face_image.bluriness, BLURINESS_HIGH_TRESHOLD) / BLURINESS_HIGH_TRESHOLD * 60
+            bluriness_bonus = min(face_image.bluriness, BLURINESS_HIGH_TRESHOLD) / BLURINESS_HIGH_TRESHOLD * BLURINESS_SCORE_BONUS
             total_score = card_score + bluriness_bonus
-            if total_score > best_score:
+            if total_score > best_score or (
+                total_score == best_score
+                and face_image.bluriness > (selected_image.bluriness if selected_image else -1)
+            ):
                 selected_face = face
                 selected_image = face_image
                 best_score = total_score
-            if (
-                selected_face.card.lang == preferred_lang
-                and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD
-            ):
-                # Found a high-quality card in the preferred language — no need to keep looking
-                break
+
         return selected_face, selected_image
