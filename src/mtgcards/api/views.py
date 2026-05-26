@@ -1,6 +1,6 @@
 # Create your views here.
 from django_filters import rest_framework as filters
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from django.views.generic import TemplateView
 from mtgcards.api.utils import scryfall
 from rest_framework.views import APIView
@@ -223,11 +223,14 @@ class CardApiView(APIView):
 
     def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg", preferred_number=None, preferred_set=None):
         t0 = time.perf_counter()
+        faces = faces.select_related('card').prefetch_related(
+            Prefetch('images', queryset=Image.objects.filter(extension=extension), to_attr='ext_images')
+        )
         best_score = -1
         face_count = 0
         for face in faces:
             face_count += 1
-            face_image = face.images.filter(extension=extension).first()
+            face_image = face.ext_images[0] if face.ext_images else None
 
             if not face_image:
                 continue
