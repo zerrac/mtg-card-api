@@ -206,6 +206,8 @@ class CardApiView(APIView):
             Prefetch('images', queryset=Image.objects.filter(extension=extension), to_attr='ext_images')
         )
         best_score = -1
+        selected_face = None
+        selected_image = None
         for face in faces:
             face_image = face.ext_images[0] if face.ext_images else None
 
@@ -214,15 +216,14 @@ class CardApiView(APIView):
             card_score = face.card.evaluate_score(
                 preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set
             )
-            if card_score > best_score:
+            # Sharpness bonus: max 60 pts (capped at BLURINESS_HIGH_TRESHOLD) so it can
+            # override frame/numeric-era ties (±50 pts) but not language preference (100-200 pts).
+            bluriness_bonus = min(face_image.bluriness, BLURINESS_HIGH_TRESHOLD) / BLURINESS_HIGH_TRESHOLD * 60
+            total_score = card_score + bluriness_bonus
+            if total_score > best_score:
                 selected_face = face
                 selected_image = face_image
-                best_score = card_score
-            elif card_score == best_score:
-                if face_image.bluriness > selected_image.bluriness:
-                    selected_face = face
-                    selected_image = face_image
-                    best_score = card_score
+                best_score = total_score
             if (
                 selected_face.card.lang == preferred_lang
                 and selected_image.bluriness > BLURINESS_HIGH_TRESHOLD
