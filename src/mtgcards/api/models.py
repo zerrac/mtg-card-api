@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.files import File
-import urllib.request
+from io import BytesIO
 import time
 import logging
 
@@ -112,16 +112,9 @@ class Image(models.Model):
 
     def download(self):
         t0 = time.perf_counter()
-        req = urllib.request.Request(
-            self.url,
-            data=None,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
-            },
-        )
-        f = urllib.request.urlopen(req, timeout=30)
-
-        self.image = File(f, name=self.face.name + "." + self.extension)
+        response = scryfall.http.get(self.url, timeout=30)
+        response.raise_for_status()
+        self.image = File(BytesIO(response.content), name=self.face.name + "." + self.extension)
         self.save()
         t1 = time.perf_counter()
         self.bluriness = images.measure_blurriness(self.image.path)

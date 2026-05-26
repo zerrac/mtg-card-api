@@ -239,10 +239,6 @@ class CardApiView(APIView):
                 selected_image = face_image
                 best_score = card_score
             elif card_score == best_score:
-                if not face_image.image:
-                    face_image.download()
-                if not selected_image.image:
-                    selected_image.download()
                 if face_image.bluriness > selected_image.bluriness:
                     selected_face = face
                     selected_image = face_image
