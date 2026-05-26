@@ -79,7 +79,7 @@ SIDES_CHOICES = [
     ("back", "back"),
 ]
 class Face(models.Model):
-    name = models.CharField(max_length=500, default="")
+    name = models.CharField(max_length=500, default="", db_index=True)
     side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
     type_line = models.CharField(max_length=500, default="")
     card = models.ForeignKey(
