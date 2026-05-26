@@ -17,7 +17,10 @@ from . import BLURINESS_HIGH_TRESHOLD, BLURINESS_LOW_TRESHOLD
 import requests
 
 import os
+import time
+import logging
 
+logger = logging.getLogger(__name__)
 
 from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
@@ -109,6 +112,7 @@ class CardApiView(APIView):
         },
     )
     def get(self, request, format=None):
+        t_start = time.perf_counter()
         preferred_lang = request.GET.get("preferred_lang", "en")
         image_format = request.GET.get("image_format", "png")
         face_name = request.GET.get("face_name")
@@ -183,6 +187,13 @@ class CardApiView(APIView):
                 faces, "en", image_format, None, None
             )
 
+        total_ms = (time.perf_counter() - t_start) * 1000
+        logger.info(
+            "card_request card=%s total=%.0fms",
+            face_name or oracle_id or scryfall_id,
+            total_ms,
+        )
+
         if "debug" in request.GET:
             return Response(CardSerializer(selected_face.card, context={"request": request}).data)
 
@@ -190,6 +201,7 @@ class CardApiView(APIView):
         return FileResponse(selected_image.image.open('rb'), content_type=content_type)
 
     def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
+        t0 = time.perf_counter()
         face, image = self.select_best_candidate(
             faces,
             preferred_lang=preferred_lang,
@@ -197,13 +209,24 @@ class CardApiView(APIView):
             preferred_number=preferred_number,
             preferred_set=preferred_set,
         )
-        if not image.image:
+        t1 = time.perf_counter()
+        needs_download = not image.image
+        if needs_download:
             image.download()
+        t2 = time.perf_counter()
+        logger.info(
+            "select_with_download lang=%s set=%s number=%s select=%.0fms download=%.0fms downloaded=%s",
+            preferred_lang, preferred_set, preferred_number,
+            (t1 - t0) * 1000, (t2 - t1) * 1000, needs_download,
+        )
         return face, image
 
     def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg", preferred_number=None, preferred_set=None):
+        t0 = time.perf_counter()
         best_score = -1
+        face_count = 0
         for face in faces:
+            face_count += 1
             face_image = face.images.filter(extension=extension).first()
 
             if not face_image:
@@ -230,4 +253,8 @@ class CardApiView(APIView):
             ):
                 # Found a high-quality card in the preferred language — no need to keep looking
                 break
+        logger.info(
+            "select_best_candidate faces=%d time=%.0fms",
+            face_count, (time.perf_counter() - t0) * 1000,
+        )
         return selected_face, selected_image

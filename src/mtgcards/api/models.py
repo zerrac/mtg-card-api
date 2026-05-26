@@ -1,9 +1,13 @@
 from django.db import models
 from django.core.files import File
 import urllib.request
+import time
+import logging
 
 from .utils import images
 from .utils import scryfall
+
+logger = logging.getLogger(__name__)
 
 # Create your models here.
 class Card(models.Model):
@@ -107,6 +111,7 @@ class Image(models.Model):
         return self.size
 
     def download(self):
+        t0 = time.perf_counter()
         req = urllib.request.Request(
             self.url,
             data=None,
@@ -118,5 +123,11 @@ class Image(models.Model):
 
         self.image = File(f, name=self.face.name + "." + self.extension)
         self.save()
+        t1 = time.perf_counter()
         self.bluriness = images.measure_blurriness(self.image.path)
         self.save()
+        t2 = time.perf_counter()
+        logger.info(
+            "image_download fetch=%.0fms blur=%.0fms url=%s",
+            (t1 - t0) * 1000, (t2 - t1) * 1000, self.url,
+        )

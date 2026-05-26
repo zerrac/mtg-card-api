@@ -169,6 +169,22 @@ SPECTACULAR_SETTINGS = {
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "mtgcards": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
+}
+
 SENTRY_DSN = os.getenv("SENTRY_DSN", None)
 if SENTRY_DSN:
     SENTRY_ENV = os.getenv("SENTRY_ENV", "dev")
