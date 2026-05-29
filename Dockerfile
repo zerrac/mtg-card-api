@@ -18,9 +18,7 @@ ARG DJANGO_SECRET_KEY=build-time-placeholder
 ENV DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 
 ARG BUILD_DATE=unknown
-RUN python manage.py collectstatic --no-input && \
-    python manage.py migrate && \
-    python manage.py import_data --online
+RUN python manage.py collectstatic --no-input
 
 CMD ["gunicorn", "mtgcards.wsgi:application", \
      "--worker-class", "gevent", "-w", "2", "-b", ":8000", \

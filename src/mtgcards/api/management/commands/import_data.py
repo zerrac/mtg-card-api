@@ -77,6 +77,8 @@ def upsert_cards(cards):
             update_fields=CARD_UPDATE_FIELDS,
             unique_fields=["scryfall_id"],
         )
+        for face in faces_models:
+            face.card_id = face.card.pk
         Face.objects.bulk_create(
             objs=faces_models,
             batch_size=1000,
@@ -84,6 +86,9 @@ def upsert_cards(cards):
             update_fields=FACE_UPDATE_FIELDS,
             unique_fields=["card", "face_index"],
         )
+
+        for img in images_models:
+            img.face_id = img.face.pk
 
         # Fetch existing image URLs so we can detect URL changes
         face_pks = [f.pk for f in faces_models]
