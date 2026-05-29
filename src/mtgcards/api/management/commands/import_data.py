@@ -77,8 +77,15 @@ def upsert_cards(cards):
             update_fields=CARD_UPDATE_FIELDS,
             unique_fields=["scryfall_id"],
         )
+        # bulk_create with update_conflicts doesn't reliably set PKs on conflicting rows,
+        # so fetch them explicitly.
+        scryfall_id_to_pk = dict(
+            Card.objects.filter(scryfall_id__in=[c.scryfall_id for c in cards_models])
+            .values_list("scryfall_id", "pk")
+        )
         for face in faces_models:
-            face.card_id = face.card.pk
+            face.card_id = scryfall_id_to_pk[face.card.scryfall_id]
+
         Face.objects.bulk_create(
             objs=faces_models,
             batch_size=1000,
@@ -86,12 +93,17 @@ def upsert_cards(cards):
             update_fields=FACE_UPDATE_FIELDS,
             unique_fields=["card", "face_index"],
         )
-
+        face_key_to_pk = {
+            (card_id, face_index): pk
+            for card_id, face_index, pk in Face.objects.filter(
+                card_id__in=scryfall_id_to_pk.values()
+            ).values_list("card_id", "face_index", "pk")
+        }
         for img in images_models:
-            img.face_id = img.face.pk
+            img.face_id = face_key_to_pk[(img.face.card_id, img.face.face_index)]
 
         # Fetch existing image URLs so we can detect URL changes
-        face_pks = [f.pk for f in faces_models]
+        face_pks = list(face_key_to_pk.values())
         existing_urls = {
             (row["face_id"], row["extension"]): row["url"]
             for row in Image.objects.filter(face_id__in=face_pks).values("face_id", "extension", "url")
@@ -101,8 +113,8 @@ def upsert_cards(cards):
         # Unchanged images are skipped entirely — nothing to update.
         images_to_upsert = [
             img for img in images_models
-            if (img.face.pk, img.extension) not in existing_urls
-            or existing_urls[(img.face.pk, img.extension)] != img.url
+            if (img.face_id, img.extension) not in existing_urls
+            or existing_urls[(img.face_id, img.extension)] != img.url
         ]
         if images_to_upsert:
             Image.objects.bulk_create(
