@@ -141,7 +141,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('Deleted %i deprecated cards.' % cards_deleted))
 
         self.stdout.write('Truncating cards...')
-        Card.objects.all().delete()
+        with connection.cursor() as cursor:
+            cursor.execute("TRUNCATE api_card CASCADE")
 
         cards = ijson.sendable_list()
         cards_imported = 0
