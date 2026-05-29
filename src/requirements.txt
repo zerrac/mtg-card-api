@@ -5,6 +5,7 @@ django-filter
 djangorestframework
 requests
 psycopg2-binary
+dj-database-url
 pillow 
 opencv-python
 ijson
@@ -12,3 +13,4 @@ tqdm
 sentry-sdk
 drf-spectacular
 whitenoise
+django-storages[s3]

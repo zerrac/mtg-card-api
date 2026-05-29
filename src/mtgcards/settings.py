@@ -88,9 +88,13 @@ WSGI_APPLICATION = "mtgcards.wsgi.application"
 
 
 # Database
-# Uses SQLite by default (Fly.io). Set DB_NAME in the environment to switch to Postgres (docker-compose dev).
+# Priority: DATABASE_URL (Fly Postgres) > DB_NAME (docker-compose) > SQLite fallback
 
-if os.getenv("DB_NAME"):
+import dj_database_url
+
+if os.getenv("DATABASE_URL"):
+    DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
+elif os.getenv("DB_NAME"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql_psycopg2",
@@ -145,6 +149,16 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
+
+if os.getenv("CLOUDFLARE_R2_BUCKET"):
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_ACCESS_KEY_ID = os.environ["CLOUDFLARE_R2_KEY_ID"]
+    AWS_SECRET_ACCESS_KEY = os.environ["CLOUDFLARE_R2_SECRET"]
+    AWS_STORAGE_BUCKET_NAME = os.environ["CLOUDFLARE_R2_BUCKET"]
+    AWS_S3_ENDPOINT_URL = f"https://{os.environ['CLOUDFLARE_R2_ACCOUNT_ID']}.r2.cloudflarestorage.com"
+    AWS_S3_REGION_NAME = "auto"
+    AWS_DEFAULT_ACL = "public-read"
+    AWS_QUERYSTRING_AUTH = False
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field

@@ -3,7 +3,7 @@ from tqdm import tqdm
 import urllib.request
 import ijson
 import functools
-from django.db import models, transaction
+from django.db import transaction
 
 from django.core.management.base import BaseCommand, CommandError
 from ...utils import scryfall
@@ -12,88 +12,59 @@ from ...models import Face
 from ...models import Image
 
 
-def backfill_images(cards, face_lookup):
-    images_models = []
-    for card in cards:
-        if card["image_status"] in ["missing", "placeholder"]:
-            continue
-        for face_name in card["name"].split(" // "):
-            face_id = face_lookup.get((card["id"], face_name))
-            if face_id is None:
-                continue
-            images_models.append(Image(
-                url=scryfall.get_face_url(card, face_name=face_name, type="normal"),
-                extension="jpg",
-                face_id=face_id,
-            ))
-            images_models.append(Image(
-                url=scryfall.get_face_url(card, face_name=face_name, type="png"),
-                extension="png",
-                face_id=face_id,
-            ))
-    if images_models:
-        with transaction.atomic():
-            Image.objects.bulk_create(objs=images_models, batch_size=1000, ignore_conflicts=True)
-    return len(images_models) // 2
+CARD_UPDATE_FIELDS = [
+    "name", "collector_number", "edition", "oracle_id", "scryfall_api_url",
+    "image_status", "frame", "lang", "layout", "full_art",
+]
+FACE_UPDATE_FIELDS = ["name", "side", "type_line", "oracle_text"]
 
 
-def create_cards(cards):
+def upsert_cards(cards):
     cards_models = []
     faces_models = []
     images_models = []
     for card in cards:
+        if card.get("layout") == "art_series":
+            continue
         try:
-            card_data = {
-                "scryfall_id": card["id"],
-                "name": card["name"],
-                "collector_number": card["collector_number"],
-                "edition": card["set"],
-                "oracle_id": scryfall.get_face_oracle(card),
-                "scryfall_api_url": card["uri"],
-                "image_status": card["image_status"],
-                "frame": card["frame"],
-                "lang": card["lang"],
-                "full_art": card["full_art"],
-                "layout": card.get("layout", ""),
-            }
-
-            card_model = Card(**card_data)
+            card_model = Card(
+                scryfall_id=card["id"],
+                name=card["name"],
+                collector_number=card["collector_number"],
+                edition=card["set"],
+                oracle_id=scryfall.get_face_oracle(card),
+                scryfall_api_url=card["uri"],
+                image_status=card["image_status"],
+                frame=card["frame"],
+                lang=card["lang"],
+                full_art=card["full_art"],
+                layout=card.get("layout", ""),
+            )
             cards_models.append(card_model)
 
-            i = 0
-            for face_name in card["name"].split(" // "):
-                if not card.get("image_uris") and i == 1:
-                    side = "back"
-                else:
-                    side = "front"
-                i += 1
-                face_data = {
-                    "name": face_name,
-                    "card": card_model,
-                    "side": side,
-                    "type_line": scryfall.get_face_type(card, face_name=face_name),
-                    "oracle_text": scryfall._get_face_data(
-                        card, "oracle_text", face_name=face_name
-                    ),
-                }
-                face_model = Face(**face_data)
+            for i, face_name in enumerate(card["name"].split(" // ")):
+                side = "back" if (not card.get("image_uris") and i == 1) else "front"
+                face_model = Face(
+                    name=face_name,
+                    card=card_model,
+                    side=side,
+                    face_index=i,
+                    type_line=scryfall.get_face_type(card, face_name=face_name),
+                    oracle_text=scryfall._get_face_data(card, "oracle_text", face_name=face_name),
+                )
                 faces_models.append(face_model)
 
-                if not card["image_status"] in ["missing","placeholder"]:
-                    image_data = {
-                        "url": scryfall.get_face_url(
-                            card, face_name=face_name, type="normal"
-                        ),
-                        "extension": "jpg",
-                        "face": face_model,
-                    }
-                    images_models.append(Image(**image_data))
-                    image_data = {
-                        "url": scryfall.get_face_url(card, face_name=face_name, type="png"),
-                        "extension": "png",
-                        "face": face_model,
-                    }
-                    images_models.append(Image(**image_data))
+                if card["image_status"] not in ["missing", "placeholder"]:
+                    images_models.append(Image(
+                        url=scryfall.get_face_url(card, face_name=face_name, type="normal"),
+                        extension="jpg",
+                        face=face_model,
+                    ))
+                    images_models.append(Image(
+                        url=scryfall.get_face_url(card, face_name=face_name, type="png"),
+                        extension="png",
+                        face=face_model,
+                    ))
         except:
             print(card["uri"])
             raise
@@ -102,19 +73,44 @@ def create_cards(cards):
         Card.objects.bulk_create(
             objs=cards_models,
             batch_size=1000,
+            update_conflicts=True,
+            update_fields=CARD_UPDATE_FIELDS,
+            unique_fields=["scryfall_id"],
         )
         Face.objects.bulk_create(
             objs=faces_models,
             batch_size=1000,
+            update_conflicts=True,
+            update_fields=FACE_UPDATE_FIELDS,
+            unique_fields=["card", "face_index"],
         )
-        Image.objects.bulk_create(
-            objs=images_models,
-            batch_size=1000,
-        )
+
+        # Fetch existing image URLs so we can detect URL changes
+        face_pks = [f.pk for f in faces_models]
+        existing_urls = {
+            (row["face_id"], row["extension"]): row["url"]
+            for row in Image.objects.filter(face_id__in=face_pks).values("face_id", "extension", "url")
+        }
+
+        # Images whose URL changed (or are new) need bluriness/size/image reset.
+        # Unchanged images are skipped entirely — nothing to update.
+        images_to_upsert = [
+            img for img in images_models
+            if (img.face.pk, img.extension) not in existing_urls
+            or existing_urls[(img.face.pk, img.extension)] != img.url
+        ]
+        if images_to_upsert:
+            Image.objects.bulk_create(
+                objs=images_to_upsert,
+                batch_size=1000,
+                update_conflicts=True,
+                update_fields=["url", "bluriness", "size", "image"],
+                unique_fields=["face", "extension"],
+            )
+
 
 class Command(BaseCommand):
     help = "import card bulk-data from scryfall"
-    # suppressed_base_arguments = True
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -151,8 +147,6 @@ class Command(BaseCommand):
 
         buf_size = 655360
 
-        # Delete deprecated cards first so their IDs are not in existing_scryfall_id,
-        # allowing the bulk file to re-import any card whose ID was reused or re-added.
         cards_deleted = 0
         for migration in scryfall.get_migrations():
             to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
@@ -163,23 +157,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))
 
-        existing_scryfall_id = set([card.scryfall_id for card in Card.objects.all()])
-
-        # Build lookup for faces that need images backfilled (existing cards, no images yet)
-        faces_without_images = (
-            Face.objects.filter(images__isnull=True)
-            .exclude(card__image_status__in=["missing", "placeholder"])
-            .select_related("card")
-        )
-        needs_images_scryfall_id = set()
-        face_lookup = {}
-        for face in faces_without_images:
-            needs_images_scryfall_id.add(face.card.scryfall_id)
-            face_lookup[(face.card.scryfall_id, face.name)] = face.id
-
         cards = ijson.sendable_list()
-        cards_created = 0
-        images_backfilled = 0
         coro = ijson.items_coro(cards, "item")
         with tqdm(
             total=bulk_size,
@@ -189,28 +167,12 @@ class Command(BaseCommand):
         ) as t:
             for chunk in iter(functools.partial(f.read, buf_size), b""):
                 coro.send(chunk)
-                if len(cards)>800:
-                    to_create = [card for card in cards if not card["id"] in existing_scryfall_id and card.get("layout") != "art_series"]
-                    to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
-                    cards_created += len(to_create)
-                    images_backfilled += backfill_images(to_backfill, face_lookup)
-                    create_cards(to_create)
+                if len(cards) > 800:
+                    upsert_cards(cards)
                     del cards[:]
                 t.update(buf_size)
             coro.close()
 
-        # create the remaining cards
-        to_create = [card for card in cards if not card["id"] in existing_scryfall_id and card.get("layout") != "art_series"]
-        to_backfill = [card for card in cards if card["id"] in needs_images_scryfall_id]
-        cards_created += len(to_create)
-        images_backfilled += backfill_images(to_backfill, face_lookup)
-        create_cards(to_create)
+        upsert_cards(cards)
 
-        if cards_created > 0:
-            self.stdout.write(self.style.SUCCESS('Successfully imported %i new cards.' % cards_created))
-        else:
-            self.stdout.write(self.style.SUCCESS('No new cards to import'))
-        if images_backfilled > 0:
-            self.stdout.write(self.style.SUCCESS('Backfilled images for %i faces.' % images_backfilled))
-        else:
-            self.stdout.write(self.style.SUCCESS('No images to backfill.'))
+        self.stdout.write(self.style.SUCCESS('Import complete.'))

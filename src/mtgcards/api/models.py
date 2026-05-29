@@ -78,6 +78,7 @@ SIDES_CHOICES = [
 class Face(models.Model):
     name = models.CharField(max_length=500, default="")
     side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
+    face_index = models.IntegerField(default=0)
     type_line = models.CharField(max_length=500, default="")
     card = models.ForeignKey(
         Card, on_delete=models.CASCADE, related_name="faces", null=True
@@ -85,6 +86,9 @@ class Face(models.Model):
     oracle_text = models.CharField(max_length=10000, default="")
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["card", "face_index"], name="unique_face_card_index"),
+        ]
         indexes = [
             models.Index(Upper('name'), name='face_name_upper_idx'),
         ]
@@ -115,7 +119,6 @@ class Image(models.Model):
     def download(self):
         response = scryfall.http.get(self.url, timeout=30)
         response.raise_for_status()
+        self.bluriness = images.measure_blurriness(response.content)
         self.image = File(BytesIO(response.content), name=self.face.name + "." + self.extension)
-        self.save()
-        self.bluriness = images.measure_blurriness(self.image.path)
         self.save()
