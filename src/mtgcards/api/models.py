@@ -93,6 +93,23 @@ class Face(models.Model):
             models.Index(Upper('name'), name='face_name_upper_idx'),
         ]
 
+class BlurCache(models.Model):
+    """Persists locally computed bluriness and image file references across re-imports."""
+    scryfall_id = models.CharField(max_length=100)
+    face_index = models.IntegerField(default=0)
+    extension = models.CharField(max_length=10)
+    bluriness = models.FloatField(default=0.0)
+    image_key = models.CharField(max_length=500, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scryfall_id", "face_index", "extension"],
+                name="unique_blur_cache",
+            ),
+        ]
+
+
 class Image(models.Model):
     image = models.ImageField(upload_to="cards_images", blank=True, null=True)
     extension = models.CharField(max_length=10, default="")
@@ -122,3 +139,9 @@ class Image(models.Model):
         self.bluriness = images.measure_blurriness(response.content)
         self.image = File(BytesIO(response.content), name=self.face.name + "." + self.extension)
         self.save()
+        BlurCache.objects.update_or_create(
+            scryfall_id=self.face.card.scryfall_id,
+            face_index=self.face.face_index,
+            extension=self.extension,
+            defaults={"bluriness": self.bluriness, "image_key": self.image.name},
+        )

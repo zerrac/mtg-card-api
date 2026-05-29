@@ -3,23 +3,14 @@ from tqdm import tqdm
 import urllib.request
 import ijson
 import functools
-from django.db import transaction
+from django.db import connection, transaction
 
 from django.core.management.base import BaseCommand, CommandError
 from ...utils import scryfall
-from ...models import Card
-from ...models import Face
-from ...models import Image
+from ...models import Card, Face, Image
 
 
-CARD_UPDATE_FIELDS = [
-    "name", "collector_number", "edition", "oracle_id", "scryfall_api_url",
-    "image_status", "frame", "lang", "layout", "full_art",
-]
-FACE_UPDATE_FIELDS = ["name", "side", "type_line", "oracle_text"]
-
-
-def upsert_cards(cards):
+def _build_models(cards):
     cards_models = []
     faces_models = []
     images_models = []
@@ -68,62 +59,39 @@ def upsert_cards(cards):
         except:
             print(card["uri"])
             raise
+    return cards_models, faces_models, images_models
 
+
+def insert_batch(cards):
+    cards_models, faces_models, images_models = _build_models(cards)
+    if not cards_models:
+        return 0
     with transaction.atomic():
-        Card.objects.bulk_create(
-            objs=cards_models,
-            batch_size=1000,
-            update_conflicts=True,
-            update_fields=CARD_UPDATE_FIELDS,
-            unique_fields=["scryfall_id"],
-        )
-        # bulk_create with update_conflicts doesn't reliably set PKs on conflicting rows,
-        # so fetch them explicitly.
-        scryfall_id_to_pk = dict(
-            Card.objects.filter(scryfall_id__in=[c.scryfall_id for c in cards_models])
-            .values_list("scryfall_id", "pk")
-        )
+        Card.objects.bulk_create(objs=cards_models, batch_size=1000)
         for face in faces_models:
-            face.card_id = scryfall_id_to_pk[face.card.scryfall_id]
-
-        Face.objects.bulk_create(
-            objs=faces_models,
-            batch_size=1000,
-            update_conflicts=True,
-            update_fields=FACE_UPDATE_FIELDS,
-            unique_fields=["card", "face_index"],
-        )
-        face_key_to_pk = {
-            (card_id, face_index): pk
-            for card_id, face_index, pk in Face.objects.filter(
-                card_id__in=scryfall_id_to_pk.values()
-            ).values_list("card_id", "face_index", "pk")
-        }
+            face.card_id = face.card.pk
+        Face.objects.bulk_create(objs=faces_models, batch_size=1000)
         for img in images_models:
-            img.face_id = face_key_to_pk[(img.face.card_id, img.face.face_index)]
+            img.face_id = img.face.pk
+        Image.objects.bulk_create(objs=images_models, batch_size=1000)
+    return len(cards_models)
 
-        # Fetch existing image URLs so we can detect URL changes
-        face_pks = list(face_key_to_pk.values())
-        existing_urls = {
-            (row["face_id"], row["extension"]): row["url"]
-            for row in Image.objects.filter(face_id__in=face_pks).values("face_id", "extension", "url")
-        }
 
-        # Images whose URL changed (or are new) need bluriness/size/image reset.
-        # Unchanged images are skipped entirely — nothing to update.
-        images_to_upsert = [
-            img for img in images_models
-            if (img.face_id, img.extension) not in existing_urls
-            or existing_urls[(img.face_id, img.extension)] != img.url
-        ]
-        if images_to_upsert:
-            Image.objects.bulk_create(
-                objs=images_to_upsert,
-                batch_size=1000,
-                update_conflicts=True,
-                update_fields=["url", "bluriness", "size", "image"],
-                unique_fields=["face", "extension"],
-            )
+def backfill_blur():
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE api_image AS i
+            SET bluriness = bc.bluriness,
+                image     = bc.image_key
+            FROM api_blurcache AS bc
+            JOIN api_face AS f ON f.id = i.face_id
+            JOIN api_card AS c ON c.id = f.card_id
+            WHERE c.scryfall_id = bc.scryfall_id
+              AND f.face_index  = bc.face_index
+              AND i.extension   = bc.extension
+              AND bc.bluriness  > 0
+        """)
+        return cursor.rowcount
 
 
 class Command(BaseCommand):
@@ -169,27 +137,29 @@ class Command(BaseCommand):
             to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
             cards_deleted += len(to_delete)
             to_delete.delete()
-        if cards_deleted > 0:
-            self.stdout.write(self.style.SUCCESS('Successfully deleted %i deprecated cards.' % cards_deleted))
-        else:
-            self.stdout.write(self.style.SUCCESS('No deprecated cards to delete.'))
+        if cards_deleted:
+            self.stdout.write(self.style.SUCCESS('Deleted %i deprecated cards.' % cards_deleted))
+
+        self.stdout.write('Truncating cards...')
+        Card.objects.all().delete()
 
         cards = ijson.sendable_list()
+        cards_imported = 0
         coro = ijson.items_coro(cards, "item")
-        with tqdm(
-            total=bulk_size,
-            desc=tqdm_desc,
-            unit="B",
-            unit_scale=True,
-        ) as t:
+        with tqdm(total=bulk_size, desc=tqdm_desc, unit="B", unit_scale=True) as t:
             for chunk in iter(functools.partial(f.read, buf_size), b""):
                 coro.send(chunk)
                 if len(cards) > 800:
-                    upsert_cards(cards)
+                    cards_imported += insert_batch(cards)
                     del cards[:]
                 t.update(buf_size)
             coro.close()
 
-        upsert_cards(cards)
+        cards_imported += insert_batch(cards)
 
-        self.stdout.write(self.style.SUCCESS('Import complete.'))
+        self.stdout.write('Restoring bluriness from cache...')
+        restored = backfill_blur()
+
+        self.stdout.write(self.style.SUCCESS(
+            'Imported %i cards, restored bluriness for %i images.' % (cards_imported, restored)
+        ))
