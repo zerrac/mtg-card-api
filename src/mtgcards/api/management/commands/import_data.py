@@ -80,16 +80,18 @@ def insert_batch(cards):
 def backfill_blur():
     with connection.cursor() as cursor:
         cursor.execute("""
-            UPDATE api_image AS i
+            UPDATE api_image
             SET bluriness = bc.bluriness,
                 image     = bc.image_key
-            FROM api_blurcache AS bc
-            JOIN api_face AS f ON f.id = i.face_id
-            JOIN api_card AS c ON c.id = f.card_id
-            WHERE c.scryfall_id = bc.scryfall_id
-              AND f.face_index  = bc.face_index
-              AND i.extension   = bc.extension
-              AND bc.bluriness  > 0
+            FROM api_blurcache AS bc,
+                 api_face AS f,
+                 api_card AS c
+            WHERE api_image.face_id  = f.id
+              AND f.card_id          = c.id
+              AND c.scryfall_id      = bc.scryfall_id
+              AND f.face_index       = bc.face_index
+              AND api_image.extension = bc.extension
+              AND bc.bluriness       > 0
         """)
         return cursor.rowcount
 
