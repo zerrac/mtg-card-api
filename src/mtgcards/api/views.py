@@ -1,5 +1,8 @@
 # Create your views here.
+from concurrent.futures import ThreadPoolExecutor
+
 from django_filters import rest_framework as filters
+from django.db import connection as db_connection
 from django.db.models import Q, Count, Prefetch
 from django.db.models.functions import Upper
 from django.views.generic import TemplateView
@@ -18,6 +21,8 @@ from . import BLURINESS_HIGH_TRESHOLD, BLURINESS_LOW_TRESHOLD, BLURINESS_SCORE_B
 import requests
 
 import os
+
+_DOWNLOAD_WORKERS = 8
 
 from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
@@ -196,17 +201,27 @@ class CardApiView(APIView):
         return FileResponse(selected_image.image.open('rb'), content_type=content_type)
 
     def _ensure_all_downloaded(self, faces, preferred_lang, extension):
-        undownloaded = Image.objects.filter(
+        pks = list(Image.objects.filter(
             Q(image='') | Q(image__isnull=True),
             face__in=faces,
             face__card__lang=preferred_lang,
             extension=extension,
-        ).select_related('face')
-        for image in undownloaded:
+        ).values_list('pk', flat=True))
+
+        if not pks:
+            return
+
+        def _download(pk):
             try:
-                image.download()
+                img = Image.objects.select_related('face__card').get(pk=pk)
+                img.download()
             except Exception:
                 pass
+            finally:
+                db_connection.close()
+
+        with ThreadPoolExecutor(max_workers=_DOWNLOAD_WORKERS) as executor:
+            list(executor.map(_download, pks))
 
     def _build_debug_response(self, faces, preferred_lang, extension, preferred_number, preferred_set, selected_face, selected_image):
         annotated = faces.select_related('card').prefetch_related(
