@@ -1,8 +1,10 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg libsm6 libxext6 build-essential python3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1
 
 RUN pip install --upgrade pip
 
@@ -12,15 +14,7 @@ COPY src/requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 COPY src/ .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# Placeholder key for build-time management commands only — replaced by secret at runtime
-ARG DJANGO_SECRET_KEY=build-time-placeholder
-ENV DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-
-ARG BUILD_DATE=unknown
-RUN python manage.py collectstatic --no-input
-
-CMD ["gunicorn", "mtgcards.wsgi:application", \
-     "--worker-class", "gevent", "-w", "2", "-b", ":8000", \
-     "--timeout", "120", \
-     "--access-logfile", "-", "--error-logfile", "-"]
+ENTRYPOINT ["./entrypoint.sh"]

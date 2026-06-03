@@ -47,9 +47,6 @@ class Card(models.Model):
         if self.edition != "sld":
             score += 10
 
-        if self.edition in ['tle', 'fca', 'prm', 'mar'] and not preferred_set:
-            score -= 100
-
         if preferred_set and self.edition.lower() == preferred_set.lower():
             score += 1500
 
@@ -110,6 +107,7 @@ class Image(models.Model):
 
         if store and storage.exists(key):
             data = storage.open(key).read()
+            self.image.name = key
         else:
             req = urllib.request.Request(
                 self.url,

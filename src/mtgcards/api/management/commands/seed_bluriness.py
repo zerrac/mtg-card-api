@@ -1,12 +1,16 @@
-from django.core.management.base import BaseCommand
-from django.db.models import Count, Max
-from tqdm import tqdm
+import time
 
-from ...models import Card, Image
+from django.core.management.base import BaseCommand
+from django.db.models import Count
+
+from ...models import Card
+from .seed_popular_cards import _select_bulk
+
+SIDES = ["front", "back"]
 
 
 class Command(BaseCommand):
-    help = "Pre-compute bluriness scores for cards with many prints, storing only the sharpest per lang to S3"
+    help = "Pre-seed R2 with the best images for cards with many prints"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -33,79 +37,59 @@ class Command(BaseCommand):
         extension = options["extension"]
         langs = options["langs"]
 
-        busy_oracle_ids = list(
+        oracle_ids = list(
             Card.objects.values("oracle_id")
             .annotate(n=Count("id"))
             .filter(n__gte=min_prints)
             .values_list("oracle_id", flat=True)
         )
 
-        images_qs = (
-            Image.objects.filter(
-                face__card__oracle_id__in=busy_oracle_ids,
-                extension=extension,
-                bluriness=0,
-                face__card__lang__in=langs,
-            )
-            .exclude(face__card__image_status__in=["placeholder", "missing"])
-            .select_related("face__card")
-        )
-
-        total = images_qs.count()
+        found = len(oracle_ids)
         self.stdout.write(
-            "Phase 1: measuring bluriness for %d images (no S3 upload)..." % total
+            "Found %d oracle_ids with ≥%d prints (langs: %s, ext: %s)"
+            % (found, min_prints, " ".join(langs), extension)
         )
 
+        self.stdout.write(
+            "Phase 1: selecting best images (%d oracle_ids × %d langs × %d sides)..."
+            % (found, len(langs), len(SIDES))
+        )
+
+        selected_images = []
         errors = 0
-        with tqdm(total=total, unit="img") as t:
-            for image in images_qs.iterator():
-                try:
-                    image.download(store=False)
-                except Exception as e:
-                    self.stderr.write("Error measuring %s: %s" % (image.url, e))
-                    errors += 1
-                t.update(1)
+        t0 = time.monotonic()
 
-        # Find best image (highest bluriness) per (oracle_id, lang, face_index)
-        groups = (
-            Image.objects.filter(
-                face__card__oracle_id__in=busy_oracle_ids,
-                extension=extension,
-                face__card__lang__in=langs,
-            )
-            .exclude(face__card__image_status__in=["placeholder", "missing"])
-            .values("face__card__oracle_id", "face__card__lang", "face__face_index")
-            .annotate(max_blur=Max("bluriness"))
+        for lang in langs:
+            for side in SIDES:
+                imgs, errs = _select_bulk(oracle_ids, lang, side, extension)
+                selected_images.extend(imgs)
+                errors += errs
+
+        elapsed = time.monotonic() - t0
+        self.stdout.write(
+            "  Phase 1 done in %.1fs — %d images to upload" % (elapsed, len(selected_images))
         )
-
-        best_pks = []
-        for group in groups:
-            img = (
-                Image.objects.filter(
-                    face__card__oracle_id=group["face__card__oracle_id"],
-                    face__card__lang=group["face__card__lang"],
-                    face__face_index=group["face__face_index"],
-                    extension=extension,
-                    bluriness=group["max_blur"],
-                )
-                .select_related("face__card")
-                .first()
-            )
-            if img:
-                best_pks.append(img.pk)
 
         self.stdout.write(
-            "Phase 2: uploading %d best images to S3..." % len(best_pks)
+            "Phase 2: uploading %d selected images to R2..." % len(selected_images)
         )
 
-        with tqdm(total=len(best_pks), unit="img") as t:
-            for img in Image.objects.filter(pk__in=best_pks).select_related("face__card"):
-                try:
-                    img.download(store=True)
-                except Exception as e:
-                    self.stderr.write("Error storing %s: %s" % (img.url, e))
-                    errors += 1
-                t.update(1)
+        total2 = len(selected_images)
+        step2 = max(1, total2 // 20)
+        t1 = time.monotonic()
+        for i, image in enumerate(selected_images, 1):
+            try:
+                image.download(store=True)
+            except Exception as e:
+                self.stderr.write("Error storing %s: %s" % (image.url, e))
+                errors += 1
+            if i % step2 == 0 or i == total2:
+                elapsed = time.monotonic() - t1
+                rate = i / elapsed if elapsed else 0
+                self.stdout.write(
+                    "  Phase 2: %d/%d (%d%%) — %.1f img/s"
+                    % (i, total2, 100 * i // total2, rate)
+                )
 
         self.stdout.write(
             self.style.SUCCESS("Done. %d errors total." % errors)

@@ -1,0 +1,15 @@
+.git
+.env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+*.egg-info
+dist
+build
+.coverage
+docker-compose*.yml
+nginx
+traefik
+.claude

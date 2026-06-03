@@ -1,0 +1,27 @@
+services:
+  web:
+    entrypoint: ""
+    command:
+      - sh
+      - -c
+      - >-
+        python manage.py collectstatic --no-input &&
+        python manage.py migrate --no-input &&
+        gunicorn mtgcards.wsgi:application
+        --worker-class gevent -w 2 -b :8000
+        --reload --access-logfile - --error-logfile -
+    volumes:
+      - ./src/:/code
+      - django_static:/static/
+      - django_media:/django_media/
+    environment:
+      DEBUG: "true"
+  nginx:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.mtg-card-api.loadbalancer.server.port=80"
+      - "traefik.http.routers.mtg-card-api.rule=Host(`${PUBLIC_HOSTNAME}`)"
+      - "traefik.http.services.mtg-card-api.loadbalancer.server.scheme=http"
+      - "traefik.docker.network=${TRAEFIK_BRIDGE:-webung_traefik}"
+      - "traefik.http.routers.mtg-card-api.entrypoints=web"
+      - "traefik.http.routers.mtg-card-api.tls=false"

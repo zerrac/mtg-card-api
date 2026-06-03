@@ -1,0 +1,19 @@
+http:
+  routers:
+    traefik-dashboard:
+      rule: "Host(`traefik.zerrac.fr`)"
+      service: api@internal
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - dashboard-auth
+
+  middlewares:
+    force-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$.2lfNPfR$F1/WO3WHixq2cQ6vRjy4F0"

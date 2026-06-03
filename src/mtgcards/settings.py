@@ -37,8 +37,8 @@ else:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "NO").lower() in ("on", "true", "y", "yes")
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
-ALLOWED_HOSTS = [] if not any(ALLOWED_HOSTS) else ALLOWED_HOSTS
+_public_hostname = os.environ.get("PUBLIC_HOSTNAME", "")
+ALLOWED_HOSTS = [_public_hostname] if _public_hostname else []
 
 # Application definition
 
@@ -175,6 +175,7 @@ if CLOUDFLARE_R2_ACCOUNT_ID:
     AWS_DEFAULT_ACL = None          # R2 uses bucket-level public access, not object ACLs
     AWS_QUERYSTRING_AUTH = False    # public bucket — no signed URLs
     AWS_S3_FILE_OVERWRITE = True
+    AWS_LOCATION = os.getenv("CLOUDFLARE_R2_PREFIX", "prod")
     if os.getenv("CLOUDFLARE_R2_PUBLIC_DOMAIN"):
         AWS_S3_CUSTOM_DOMAIN = os.environ["CLOUDFLARE_R2_PUBLIC_DOMAIN"]
 

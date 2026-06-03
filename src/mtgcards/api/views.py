@@ -9,11 +9,11 @@ from rest_framework import authentication, permissions
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 
-from django.db.models import Prefetch
 from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
-from . import BLURINESS_HIGH_TRESHOLD, BLURINESS_LOW_TRESHOLD
+from . import BLURINESS_LOW_TRESHOLD
+from .selection import select_best_candidate
 import requests
 
 import os
@@ -188,6 +188,9 @@ class CardApiView(APIView):
                 selected_face,
             ))
 
+        if not selected_image.image:
+            selected_image.download()
+
         content_type = "image/jpeg" if image_format == "jpg" else "image/png"
         return FileResponse(selected_image.image.open('rb'), content_type=content_type)
 
@@ -212,45 +215,13 @@ class CardApiView(APIView):
         return {"preferred_lang": preferred_lang, "candidates": candidates}
 
     def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
-        face, image = self.select_best_candidate(
+        face, image = select_best_candidate(
             faces,
             preferred_lang=preferred_lang,
             extension=extension,
             preferred_number=preferred_number,
             preferred_set=preferred_set,
         )
-        if not image.image:
-            image.download()
+        if image.bluriness == 0:
+            image.download(store=False)
         return face, image
-
-    def select_best_candidate(self, faces, preferred_lang="fr", extension="jpg", preferred_number=None, preferred_set=None):
-        best_card_score = -1
-        best_bluriness = -1
-        selected_face = None
-        selected_image = None
-        faces = faces.prefetch_related(
-            Prefetch("images", queryset=Image.objects.filter(extension=extension), to_attr="prefetched_images")
-        )
-        for face in faces:
-            face_image = face.prefetched_images[0] if face.prefetched_images else None
-
-            if not face_image:
-                continue
-            card_score = face.card.evaluate_score(
-                preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set
-            )
-            if card_score < best_card_score:
-                continue
-            if face_image.bluriness == 0:
-                face_image.download()
-            if card_score > best_card_score or face_image.bluriness > best_bluriness:
-                selected_face = face
-                selected_image = face_image
-                best_card_score = card_score
-                best_bluriness = face_image.bluriness
-                if (face.card.lang == preferred_lang
-                        and best_bluriness >= BLURINESS_HIGH_TRESHOLD
-                        and not preferred_set
-                        and not preferred_number):
-                    break
-        return selected_face, selected_image
