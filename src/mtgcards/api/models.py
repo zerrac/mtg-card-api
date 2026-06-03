@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.files import File
+from django.core.files.base import ContentFile
 import urllib.request
 
 from .utils import images
@@ -19,6 +19,7 @@ class Card(models.Model):
     image_status = models.CharField(max_length=100, default="")
     frame = models.CharField(max_length=10, default="")
     lang = models.CharField(max_length=10, default="")
+    layout = models.CharField(max_length=50, default="")
     full_art = models.BooleanField(default=False)
 
     class Meta:
@@ -40,23 +41,14 @@ class Card(models.Model):
         if self.collector_number.isnumeric():
             score += 50
 
-        # if self.faces.filter(side="front")[0].type_line.lower().startswith("basic land") and self.full_art:
-        #     score += 50
-
         if self.frame.isdigit() and int(self.frame) >= 2003:
             score += 50
 
         if self.edition != "sld":
             score += 10
 
-        # Nobody likes tle
-        if self.edition == 'tle':
+        if self.edition in ['tle', 'fca', 'prm', 'mar'] and not preferred_set:
             score -= 100
-
-        # if self.image_status == "highres_scan":
-        #     score += 2
-        # elif self.image_status == "lowres":
-        #     score += 1
 
         if preferred_set and self.edition.lower() == preferred_set.lower():
             score += 1500
@@ -73,14 +65,21 @@ SIDES_CHOICES = [
     ("front", "front"),
     ("back", "back"),
 ]
+
 class Face(models.Model):
     name = models.CharField(max_length=500, default="")
     side = models.CharField(max_length=5, choices=SIDES_CHOICES, default="front")
+    face_index = models.IntegerField(default=0)
     type_line = models.CharField(max_length=500, default="")
     card = models.ForeignKey(
         Card, on_delete=models.CASCADE, related_name="faces", null=True
     )
     oracle_text = models.CharField(max_length=10000, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["card", "face_index"], name="unique_face_card_index"),
+        ]
 
 class Image(models.Model):
     image = models.ImageField(upload_to="cards_images", blank=True, null=True)
@@ -105,17 +104,24 @@ class Image(models.Model):
             self.save()
         return self.size
 
-    def download(self):
-        req = urllib.request.Request(
-            self.url,
-            data=None,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
-            },
-        )
-        f = urllib.request.urlopen(req)
+    def download(self, store=True):
+        key = f"cards/{self.face.card.scryfall_id}/{self.face.face_index}.{self.extension}"
+        storage = self.image.storage
 
-        self.image = File(f, name=self.face.name + "." + self.extension)
-        self.save()
-        self.bluriness = images.measure_blurriness(self.image.path)
+        if store and storage.exists(key):
+            data = storage.open(key).read()
+        else:
+            req = urllib.request.Request(
+                self.url,
+                data=None,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"
+                },
+            )
+            data = urllib.request.urlopen(req).read()
+            if store:
+                key = storage.save(key, ContentFile(data))
+                self.image.name = key
+
+        self.bluriness = images.measure_blurriness_from_bytes(data)
         self.save()

@@ -3,10 +3,13 @@ gevent
 django
 django-filter
 djangorestframework
+drf-spectacular
 requests
 psycopg2-binary
-pillow 
+pillow
 opencv-python
 ijson
 tqdm
 sentry-sdk
+django-storages[s3]
+boto3
