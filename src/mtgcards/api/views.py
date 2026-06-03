@@ -125,7 +125,11 @@ class CardApiView(APIView):
         strict_number = "strict_number" in request.GET
 
         if strict_set and not preferred_set:
+            preferred_set = request.GET.get("strict_set") or None
+        if strict_set and not preferred_set:
             return Response({"error": "'strict_set' requires 'preferred_set'"}, status=400)
+        if strict_number and not preferred_number:
+            preferred_number = request.GET.get("strict_number") or None
         if strict_number and not preferred_number:
             return Response({"error": "'strict_number' requires 'preferred_number'"}, status=400)
 
