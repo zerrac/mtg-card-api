@@ -27,6 +27,11 @@ class Card(models.Model):
         indexes = [
             models.Index(fields=["oracle_id"], name="card_oracle_id_idx"),
             models.Index(fields=["image_status"], name="card_image_status_idx"),
+            models.Index(
+                fields=["oracle_id"],
+                name="card_oracle_id_active_idx",
+                condition=~models.Q(image_status__in=["placeholder", "missing"]),
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -82,6 +87,8 @@ class Face(models.Model):
         indexes = [
             models.Index(fields=["side"], name="face_side_idx"),
             models.Index(Upper("name"), name="face_name_upper_idx"),
+            models.Index(Upper("name"), models.F("side"), name="face_name_upper_side_idx"),
+            models.Index(fields=["card", "side"], name="face_card_side_idx"),
         ]
         constraints = [
             models.UniqueConstraint(fields=["card", "face_index"], name="unique_face_card_index"),

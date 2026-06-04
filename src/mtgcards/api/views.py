@@ -13,7 +13,7 @@ from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
 from . import BLURINESS_LOW_TRESHOLD
-from .selection import select_best_candidate
+from .selection import select_best_candidate, sorted_candidates
 import requests
 
 import os
@@ -166,23 +166,24 @@ class CardApiView(APIView):
         if not candidates:
             return Response({"error": "No card or image found for given filters"}, status=404)
 
-        selected_face, selected_image = self._select_from_candidates(
-            candidates, preferred_lang, preferred_number, preferred_set
-        )
+        levels = [(preferred_lang, preferred_number, preferred_set)]
+        if preferred_number and not strict_number:
+            levels.append((preferred_lang, None, preferred_set))
+        if preferred_set and not strict_set:
+            levels.append((preferred_lang, None, None))
+        if preferred_lang != "en":
+            levels.append(("en", None, None))
 
-        if selected_image.bluriness < min_bluriness and preferred_number and not strict_number:
-            selected_face, selected_image = self._select_from_candidates(
-                candidates, preferred_lang, None, preferred_set
-            )
+        selected_face, selected_image = None, None
+        for lang, num, sset in levels:
+            f, i = self._find_non_blurry(candidates, min_bluriness, lang, num, sset)
+            if f is not None:
+                selected_face, selected_image = f, i
+                break
 
-        if selected_image.bluriness < min_bluriness and preferred_set and not strict_set:
+        if selected_face is None:
             selected_face, selected_image = self._select_from_candidates(
-                candidates, preferred_lang, None, None
-            )
-
-        if selected_image.bluriness < min_bluriness and preferred_lang != "en":
-            selected_face, selected_image = self._select_from_candidates(
-                candidates, "en", None, None
+                candidates, preferred_lang, preferred_number, preferred_set
             )
 
         if "debug" in request.GET:
@@ -214,7 +215,17 @@ class CardApiView(APIView):
         rows.sort(key=lambda c: (c["card_score"], c["bluriness"]), reverse=True)
         return {"preferred_lang": preferred_lang, "candidates": rows}
 
+    def _find_non_blurry(self, candidates, min_bluriness, preferred_lang, preferred_number, preferred_set):
+        """Walk candidates in score order; return first (face, image) with bluriness >= min_bluriness."""
+        for face, image in sorted_candidates(candidates, preferred_lang, preferred_number, preferred_set):
+            if image.bluriness == 0:
+                image.download(store=False)
+            if image.bluriness >= min_bluriness:
+                return face, image
+        return None, None
+
     def _select_from_candidates(self, candidates, preferred_lang, preferred_number, preferred_set):
+        """Last-resort fallback: return best-scored candidate regardless of bluriness."""
         face, image = select_best_candidate(
             candidates,
             preferred_lang=preferred_lang,
