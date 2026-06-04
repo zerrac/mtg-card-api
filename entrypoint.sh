@@ -8,8 +8,11 @@ if [ -n "$CLOUDFLARE_R2_ACCOUNT_ID" ]; then
 fi
 exec gunicorn mtgcards.wsgi:application \
     --worker-class gevent \
-    -w 4 \
+    -w 2 \
     -b :8000 \
-    --timeout 120 \
+    --timeout 30 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
     --access-logfile - \
     --error-logfile -

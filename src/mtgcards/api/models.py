@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.files.base import ContentFile
+from django.db.models.functions import Upper
 import urllib.request
 
 from .utils import images
@@ -23,6 +24,10 @@ class Card(models.Model):
     full_art = models.BooleanField(default=False)
 
     class Meta:
+        indexes = [
+            models.Index(fields=["oracle_id"], name="card_oracle_id_idx"),
+            models.Index(fields=["image_status"], name="card_image_status_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["name", "edition", "collector_number", "lang"],
@@ -74,6 +79,10 @@ class Face(models.Model):
     oracle_text = models.CharField(max_length=10000, default="")
 
     class Meta:
+        indexes = [
+            models.Index(fields=["side"], name="face_side_idx"),
+            models.Index(Upper("name"), name="face_name_upper_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=["card", "face_index"], name="unique_face_card_index"),
         ]

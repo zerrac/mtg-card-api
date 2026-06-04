@@ -1,6 +1,6 @@
 # Create your views here.
 from django_filters import rest_framework as filters
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from django.views.generic import TemplateView
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -21,7 +21,7 @@ import os
 
 from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponseRedirect
 
 
 class ImageRenderer(BaseRenderer):
@@ -143,7 +143,7 @@ class CardApiView(APIView):
             Face.objects.filter(side=side)
             .exclude(card__image_status__in=["placeholder", "missing"])
             .select_related("card")
-            .order_by("card")
+            .prefetch_related(Prefetch('images', queryset=Image.objects.filter(extension=image_format)))
         )
 
         if oracle_id:
@@ -157,71 +157,70 @@ class CardApiView(APIView):
         if strict_number:
             faces = faces.filter(card__collector_number__iexact=preferred_number)
 
-        if not faces.exists():
-            return Response(
-                {"error": "Face named %s with given filters not found in database" % face_name},
-                status=404,
-            )
+        candidates = []
+        for face in faces:
+            imgs = list(face.images.all())
+            if imgs:
+                candidates.append((face, imgs[0]))
 
-        selected_face, selected_image = self._select_with_download(
-            faces, preferred_lang, image_format, preferred_number, preferred_set
+        if not candidates:
+            return Response({"error": "No card or image found for given filters"}, status=404)
+
+        selected_face, selected_image = self._select_from_candidates(
+            candidates, preferred_lang, preferred_number, preferred_set
         )
 
         if selected_image.bluriness < min_bluriness and preferred_number and not strict_number:
-            selected_face, selected_image = self._select_with_download(
-                faces, preferred_lang, image_format, None, preferred_set
+            selected_face, selected_image = self._select_from_candidates(
+                candidates, preferred_lang, None, preferred_set
             )
 
         if selected_image.bluriness < min_bluriness and preferred_set and not strict_set:
-            selected_face, selected_image = self._select_with_download(
-                faces, preferred_lang, image_format, None, None
+            selected_face, selected_image = self._select_from_candidates(
+                candidates, preferred_lang, None, None
             )
 
         if selected_image.bluriness < min_bluriness and preferred_lang != "en":
-            selected_face, selected_image = self._select_with_download(
-                faces, "en", image_format, None, None
+            selected_face, selected_image = self._select_from_candidates(
+                candidates, "en", None, None
             )
 
         if "debug" in request.GET:
             return Response(self._build_debug_response(
-                faces, preferred_lang, image_format, preferred_number, preferred_set,
+                candidates, preferred_lang, preferred_number, preferred_set,
                 selected_face,
             ))
 
         if not selected_image.image:
             selected_image.download()
 
-        content_type = "image/jpeg" if image_format == "jpg" else "image/png"
-        return FileResponse(selected_image.image.open('rb'), content_type=content_type)
+        return HttpResponseRedirect(selected_image.image.url)
 
-    def _build_debug_response(self, faces, preferred_lang, extension, preferred_number, preferred_set, selected_face):
-        candidates = []
-        for face in faces.select_related('card'):
-            face_image = face.images.filter(extension=extension).first()
+    def _build_debug_response(self, candidates, preferred_lang, preferred_number, preferred_set, selected_face):
+        rows = []
+        for face, image in candidates:
             card_score = face.card.evaluate_score(
                 preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set
             )
-            bluriness = face_image.bluriness if face_image else 0.0
-            candidates.append({
+            rows.append({
                 "selected": face.pk == selected_face.pk,
                 "name": face.card.name,
                 "edition": face.card.edition,
                 "lang": face.card.lang,
                 "collector_number": face.card.collector_number,
                 "card_score": card_score,
-                "bluriness": round(bluriness, 2),
+                "bluriness": round(image.bluriness, 2),
             })
-        candidates.sort(key=lambda c: (c["card_score"], c["bluriness"]), reverse=True)
-        return {"preferred_lang": preferred_lang, "candidates": candidates}
+        rows.sort(key=lambda c: (c["card_score"], c["bluriness"]), reverse=True)
+        return {"preferred_lang": preferred_lang, "candidates": rows}
 
-    def _select_with_download(self, faces, preferred_lang, extension, preferred_number, preferred_set):
+    def _select_from_candidates(self, candidates, preferred_lang, preferred_number, preferred_set):
         face, image = select_best_candidate(
-            faces,
+            candidates,
             preferred_lang=preferred_lang,
-            extension=extension,
             preferred_number=preferred_number,
             preferred_set=preferred_set,
         )
-        if image.bluriness == 0:
+        if image is not None and image.bluriness == 0:
             image.download(store=False)
         return face, image

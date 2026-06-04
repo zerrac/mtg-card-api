@@ -97,6 +97,7 @@ DATABASES = {
         "PASSWORD": os.environ["DB_PASS"],
         "HOST": os.environ["DB_SERVICE"],
         "PORT": os.environ["DB_PORT"],
+        "CONN_MAX_AGE": 0,
     }
 }
 
