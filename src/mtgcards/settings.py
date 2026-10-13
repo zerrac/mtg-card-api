@@ -157,22 +157,6 @@ SPECTACULAR_SETTINGS = {
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-_redis_url = os.getenv("REDIS_URL")
-if _redis_url:
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": _redis_url,
-            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        }
-    }
-else:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        }
-    }
-
 USE_SCRYFALL_REDIRECT = os.getenv("USE_SCRYFALL_REDIRECT", "NO").lower() in ("on", "true", "y", "yes")
 
 CLOUDFLARE_R2_ACCOUNT_ID = os.getenv("CLOUDFLARE_R2_ACCOUNT_ID")

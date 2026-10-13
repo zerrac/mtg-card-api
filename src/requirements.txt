@@ -14,5 +14,4 @@ tqdm
 sentry-sdk
 django-storages[s3]
 boto3
-django-redis
 packaging

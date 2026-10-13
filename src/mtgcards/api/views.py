@@ -12,7 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
-from . import BLURINESS_LOW_TRESHOLD, IMPORT_IN_PROGRESS_CACHE_KEY
+from . import BLURINESS_LOW_TRESHOLD
 from .selection import select_best_candidate, sorted_candidates
 import requests
 
@@ -23,8 +23,6 @@ from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRen
 from rest_framework.response import Response
 from django.conf import settings
 from django.http import FileResponse, HttpResponseRedirect
-from django.core.cache import cache
-import hashlib
 
 
 class ImageRenderer(BaseRenderer):
@@ -111,13 +109,8 @@ class CardApiView(APIView):
             404: OpenApiResponse(description="No matching card face found"),
         },
     )
-    def _cache_key(self, params):
-        # Lowercase values: face_name/set/number are matched case-insensitively
-        raw = "|".join(f"{k}={str(v).lower()}" for k, v in sorted(params.items()))
-        return "card:" + hashlib.md5(raw.encode()).hexdigest()
-
     def get(self, request, format=None):
-        preferred_lang = request.GET.get("preferred_lang", "en").lower()
+        preferred_lang = request.GET.get("preferred_lang", "en")
         image_format = request.GET.get("image_format", "png")
         face_name = request.GET.get("face_name")
         oracle_id = request.GET.get("oracle_id")
@@ -146,20 +139,6 @@ class CardApiView(APIView):
 
         if side not in ("front", "back"):
             return Response({"error": "'side' must be 'front' or 'back'"}, status=400)
-
-        # Skip the cache during an import: results would be based on partial data
-        use_cache = "debug" not in request.GET and not cache.get(IMPORT_IN_PROGRESS_CACHE_KEY)
-        if use_cache:
-            cache_key = self._cache_key({
-                "oracle_id": oracle_id, "face_name": face_name, "scryfall_id": scryfall_id,
-                "preferred_lang": preferred_lang, "preferred_set": preferred_set,
-                "preferred_number": preferred_number, "side": side, "image_format": image_format,
-                "strict_set": strict_set, "strict_number": strict_number, "min_bluriness": min_bluriness,
-                "scryfall_redirect": settings.USE_SCRYFALL_REDIRECT,
-            })
-            cached_url = cache.get(cache_key)
-            if cached_url:
-                return HttpResponseRedirect(cached_url)
 
         faces = (
             Face.objects.filter(side=side)
@@ -220,8 +199,6 @@ class CardApiView(APIView):
             if not selected_image.image:
                 selected_image.download()
             url = selected_image.image.url
-        if use_cache:
-            cache.set(cache_key, url, timeout=86400)
         return HttpResponseRedirect(url)
 
     def _build_debug_response(self, candidates, preferred_lang, preferred_number, preferred_set, selected_face):
