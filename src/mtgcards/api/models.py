@@ -11,6 +11,7 @@ class Card(models.Model):
     name = models.CharField(max_length=500)
     collector_number = models.CharField(max_length=10)
     edition = models.CharField(max_length=10)
+    promo = models.BooleanField(default=False)
 
     scryfall_id = models.CharField(max_length=100, default="")
     oracle_id = models.CharField(max_length=100, default="")
@@ -54,8 +55,12 @@ class Card(models.Model):
         if self.frame.isdigit() and int(self.frame) >= 2003:
             score += 50
 
-        if self.edition != "sld":
+        if not self.promo:
+            score += 50
+
+        if self.edition not in ["slc", "sld", "slz"]:
             score += 10
+
 
         if preferred_set and self.edition.lower() == preferred_set.lower():
             score += 1500

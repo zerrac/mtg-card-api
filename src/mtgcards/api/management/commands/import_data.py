@@ -23,6 +23,7 @@ def _build_models(cards):
                 name=card["name"],
                 collector_number=card["collector_number"],
                 edition=card["set"],
+                promo=card["promo"],
                 oracle_id=scryfall.get_face_oracle(card),
                 scryfall_api_url=card["uri"],
                 image_status=card["image_status"],
