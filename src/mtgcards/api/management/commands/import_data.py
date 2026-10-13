@@ -70,7 +70,7 @@ def insert_batch(cards):
     cards_models, faces_models, images_models = _build_models(cards)
     if not cards_models:
         return 0
-    with transaction.atomic():
+    with transaction.atomic(savepoint=False):
         Card.objects.bulk_create(objs=cards_models, batch_size=1000)
         for face in faces_models:
             face.card_id = face.card.pk
