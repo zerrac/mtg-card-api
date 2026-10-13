@@ -17,6 +17,8 @@ def _build_models(cards):
     for card in cards:
         if card.get("layout") == "art_series":
             continue
+        if not 'paper' in card.get("games"):
+            continue
         try:
             card_model = Card(
                 scryfall_id=card["id"],
