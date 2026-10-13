@@ -4,10 +4,12 @@ import os
 import urllib.request
 
 from tqdm import tqdm
+from django.core.cache import cache
 from django.db import connection, transaction
 
 from django.core.management.base import BaseCommand, CommandError
 from ...utils import scryfall
+from ... import IMPORT_IN_PROGRESS_CACHE_KEY
 from ...models import Card, Face, Image
 
 
@@ -130,10 +132,19 @@ class Command(BaseCommand):
                 "import must either be online or you must specify a local bulk file"
             )
 
+        # Timeout so a killed import doesn't disable caching forever
+        cache.set(IMPORT_IN_PROGRESS_CACHE_KEY, True, timeout=12 * 3600)
         try:
             self._import(f, bulk_size, tqdm_desc)
         finally:
             f.close()
+            # Cached redirects point to images selected from the previous data
+            if hasattr(cache, "delete_pattern"):
+                cache.delete_pattern("card:*")
+            else:
+                cache.clear()
+            cache.delete(IMPORT_IN_PROGRESS_CACHE_KEY)
+            self.stdout.write(self.style.SUCCESS('Cleared card cache.'))
 
     def _import(self, f, bulk_size, tqdm_desc):
         cards_deleted = 0
