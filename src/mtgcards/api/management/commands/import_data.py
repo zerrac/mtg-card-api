@@ -1,8 +1,9 @@
+import gzip
+import json
 import os
-from tqdm import tqdm
 import urllib.request
-import ijson
-import functools
+
+from tqdm import tqdm
 from django.db import connection, transaction
 
 from django.core.management.base import BaseCommand, CommandError
@@ -59,7 +60,7 @@ def _build_models(cards):
                         extension="png",
                         face=face_model,
                     ))
-        except:
+        except Exception:
             print(card["uri"])
             raise
     return cards_models, faces_models, images_models
@@ -80,6 +81,19 @@ def insert_batch(cards):
     return len(cards_models)
 
 
+class ProgressReader:
+    """File-like wrapper that advances a tqdm bar by the raw (compressed) bytes read."""
+
+    def __init__(self, raw, bar):
+        self.raw = raw
+        self.bar = bar
+
+    def read(self, size=-1):
+        data = self.raw.read(size)
+        self.bar.update(len(data))
+        return data
+
+
 class Command(BaseCommand):
     help = "import card bulk-data from scryfall"
 
@@ -87,7 +101,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--bulk-file",
             dest="bulk_file",
-            help="Path to the bulk file downloaded from scryfall",
+            help="Path to the bulk file (.jsonl.gz) downloaded from scryfall",
         )
         parser.add_argument(
             "--online",
@@ -116,8 +130,12 @@ class Command(BaseCommand):
                 "import must either be online or you must specify a local bulk file"
             )
 
-        buf_size = 655360
+        try:
+            self._import(f, bulk_size, tqdm_desc)
+        finally:
+            f.close()
 
+    def _import(self, f, bulk_size, tqdm_desc):
         cards_deleted = 0
         for migration in scryfall.get_migrations():
             to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
@@ -130,18 +148,18 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute("TRUNCATE api_card CASCADE")
 
-        cards = ijson.sendable_list()
+        cards = []
         cards_imported = 0
-        coro = ijson.items_coro(cards, "item")
         with tqdm(total=bulk_size, desc=tqdm_desc, unit="B", unit_scale=True) as t:
-            for chunk in iter(functools.partial(f.read, buf_size), b""):
-                coro.send(chunk)
-                if len(cards) > 800:
-                    cards_imported += insert_batch(cards)
-                    del cards[:]
-                t.update(buf_size)
-            coro.close()
-
+            with gzip.GzipFile(fileobj=ProgressReader(f, t)) as gz:
+                for line in gz:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    cards.append(json.loads(line))
+                    if len(cards) >= 800:
+                        cards_imported += insert_batch(cards)
+                        cards.clear()
         cards_imported += insert_batch(cards)
 
         self.stdout.write(self.style.SUCCESS(
