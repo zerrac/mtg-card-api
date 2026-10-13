@@ -21,6 +21,7 @@ import os
 
 from rest_framework.renderers import BaseRenderer, BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
+from django.conf import settings
 from django.http import FileResponse, HttpResponseRedirect
 
 
@@ -192,10 +193,13 @@ class CardApiView(APIView):
                 selected_face,
             ))
 
-        if not selected_image.image:
-            selected_image.download()
-
-        return HttpResponseRedirect(selected_image.image.url)
+        if settings.USE_SCRYFALL_REDIRECT:
+            url = selected_image.url
+        else:
+            if not selected_image.image:
+                selected_image.download()
+            url = selected_image.image.url
+        return HttpResponseRedirect(url)
 
     def _build_debug_response(self, candidates, preferred_lang, preferred_number, preferred_set, selected_face):
         rows = []
