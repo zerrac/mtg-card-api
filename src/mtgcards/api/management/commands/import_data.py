@@ -136,31 +136,36 @@ class Command(BaseCommand):
             f.close()
 
     def _import(self, f, bulk_size, tqdm_desc):
-        cards_deleted = 0
-        for migration in scryfall.get_migrations():
-            to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
-            cards_deleted += len(to_delete)
-            to_delete.delete()
-        if cards_deleted:
-            self.stdout.write(self.style.SUCCESS('Deleted %i deprecated cards.' % cards_deleted))
+        # Single transaction: API requests keep seeing the previous data until commit.
+        # DELETE instead of TRUNCATE, whose exclusive lock would block reads for the whole import.
+        with transaction.atomic():
+            cards_deleted = 0
+            for migration in scryfall.get_migrations():
+                to_delete = Card.objects.filter(scryfall_id=migration["old_scryfall_id"])
+                cards_deleted += len(to_delete)
+                to_delete.delete()
+            if cards_deleted:
+                self.stdout.write(self.style.SUCCESS('Deleted %i deprecated cards.' % cards_deleted))
 
-        self.stdout.write('Truncating cards...')
-        with connection.cursor() as cursor:
-            cursor.execute("TRUNCATE api_card CASCADE")
+            self.stdout.write('Deleting cards...')
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM api_image")
+                cursor.execute("DELETE FROM api_face")
+                cursor.execute("DELETE FROM api_card")
 
-        cards = []
-        cards_imported = 0
-        with tqdm(total=bulk_size, desc=tqdm_desc, unit="B", unit_scale=True) as t:
-            with gzip.GzipFile(fileobj=ProgressReader(f, t)) as gz:
-                for line in gz:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    cards.append(json.loads(line))
-                    if len(cards) >= 800:
-                        cards_imported += insert_batch(cards)
-                        cards.clear()
-        cards_imported += insert_batch(cards)
+            cards = []
+            cards_imported = 0
+            with tqdm(total=bulk_size, desc=tqdm_desc, unit="B", unit_scale=True) as t:
+                with gzip.GzipFile(fileobj=ProgressReader(f, t)) as gz:
+                    for line in gz:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        cards.append(json.loads(line))
+                        if len(cards) >= 800:
+                            cards_imported += insert_batch(cards)
+                            cards.clear()
+            cards_imported += insert_batch(cards)
 
         self.stdout.write(self.style.SUCCESS(
             'Successfully imported %i cards.' % cards_imported
