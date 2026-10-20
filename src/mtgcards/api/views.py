@@ -13,7 +13,7 @@ from .models import Card, Image, Face
 from urllib.request import urlopen
 from .serializers import CardSerializer
 from . import BLURINESS_LOW_TRESHOLD
-from .selection import select_best_candidate, sorted_candidates
+from .selection import score_rank, select_best_candidate, sorted_candidates
 import requests
 
 import os
@@ -87,7 +87,9 @@ class CardApiView(APIView):
             "penalties (tle/fca/prm/mar −100, sld −10). Image sharpness (Laplacian variance) "
             "adds up to 60 bonus points. "
             "On blurry results the selection falls back: preferred_number → "
-            "preferred_set → any set → English."
+            "preferred_set → any set → English. "
+            "By default the first sufficiently sharp candidate is returned; with ?exhaustive, "
+            "every candidate sharing its score is measured and the sharpest one is returned."
         ),
         parameters=[
             OpenApiParameter("oracle_id", OpenApiTypes.UUID, description="Scryfall oracle ID (mutually exclusive with face_name/scryfall_id)"),
@@ -101,6 +103,7 @@ class CardApiView(APIView):
             OpenApiParameter("strict_set", OpenApiTypes.BOOL, required=False, description="Restrict results to preferred_set only (no fallback). Requires preferred_set."),
             OpenApiParameter("strict_number", OpenApiTypes.BOOL, required=False, description="Restrict results to preferred_number only (no fallback). Requires preferred_number."),
             OpenApiParameter("min_bluriness", OpenApiTypes.FLOAT, required=False, description=f"Minimum bluriness threshold for fallback logic. Defaults to {BLURINESS_LOW_TRESHOLD}."),
+            OpenApiParameter("exhaustive", OpenApiTypes.BOOL, required=False, description="Instead of stopping at the first sufficiently sharp candidate, measure every candidate with the same score and return the sharpest. Slower on cold images."),
             OpenApiParameter("debug", OpenApiTypes.BOOL, required=False, description="Return all candidates as JSON with scores instead of the image binary."),
         ],
         responses={
@@ -124,6 +127,7 @@ class CardApiView(APIView):
             return Response({"error": "'min_bluriness' must be a number"}, status=400)
         strict_set = "strict_set" in request.GET
         strict_number = "strict_number" in request.GET
+        exhaustive = "exhaustive" in request.GET
 
         if strict_set and not preferred_set:
             preferred_set = request.GET.get("strict_set") or None
@@ -177,7 +181,7 @@ class CardApiView(APIView):
 
         selected_face, selected_image = None, None
         for lang, num, sset in levels:
-            f, i = self._find_non_blurry(candidates, min_bluriness, lang, num, sset)
+            f, i = self._find_non_blurry(candidates, min_bluriness, lang, num, sset, exhaustive)
             if f is not None:
                 selected_face, selected_image = f, i
                 break
@@ -219,14 +223,36 @@ class CardApiView(APIView):
         rows.sort(key=lambda c: (c["card_score"], c["bluriness"]), reverse=True)
         return {"preferred_lang": preferred_lang, "candidates": rows}
 
-    def _find_non_blurry(self, candidates, min_bluriness, preferred_lang, preferred_number, preferred_set):
-        """Walk candidates in score order; return first (face, image) with bluriness >= min_bluriness."""
-        for face, image in sorted_candidates(candidates, preferred_lang, preferred_number, preferred_set):
+    def _find_non_blurry(self, candidates, min_bluriness, preferred_lang, preferred_number, preferred_set, exhaustive=False):
+        """Walk candidates in score order; return first (face, image) with bluriness >= min_bluriness.
+
+        When exhaustive, keep measuring the candidates sharing that first match's score
+        and return the sharpest of them.
+        """
+        ordered = sorted_candidates(candidates, preferred_lang, preferred_number, preferred_set)
+        for index, (face, image) in enumerate(ordered):
             if image.bluriness == 0:
                 image.download(store=False)
             if image.bluriness >= min_bluriness:
+                if exhaustive:
+                    return self._sharpest_with_same_score(
+                        ordered[index:], preferred_lang, preferred_number, preferred_set
+                    )
                 return face, image
         return None, None
+
+    def _sharpest_with_same_score(self, ordered, preferred_lang, preferred_number, preferred_set):
+        """Measure every candidate ranked like ordered[0] and return the sharpest."""
+        best_face, best_image = ordered[0]
+        rank = score_rank(best_face, preferred_lang, preferred_number, preferred_set)
+        for face, image in ordered[1:]:
+            if score_rank(face, preferred_lang, preferred_number, preferred_set) != rank:
+                break
+            if image.bluriness == 0:
+                image.download(store=False)
+            if image.bluriness > best_image.bluriness:
+                best_face, best_image = face, image
+        return best_face, best_image
 
     def _select_from_candidates(self, candidates, preferred_lang, preferred_number, preferred_set):
         """Last-resort fallback: return best-scored candidate regardless of bluriness."""
