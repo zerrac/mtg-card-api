@@ -27,6 +27,7 @@ def _build_models(cards):
                 collector_number=card["collector_number"],
                 edition=card["set"],
                 promo=card["promo"],
+                nonfoil="nonfoil" in card.get("finishes", ["nonfoil"]),
                 oracle_id=scryfall.get_face_oracle(card),
                 scryfall_api_url=card["uri"],
                 image_status=card["image_status"],

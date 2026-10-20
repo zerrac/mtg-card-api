@@ -12,6 +12,7 @@ class Card(models.Model):
     collector_number = models.CharField(max_length=10)
     edition = models.CharField(max_length=10)
     promo = models.BooleanField(default=False)
+    nonfoil = models.BooleanField(default=True)
 
     scryfall_id = models.CharField(max_length=100, default="")
     oracle_id = models.CharField(max_length=100, default="")
@@ -59,6 +60,10 @@ class Card(models.Model):
 
         if not self.promo:
             score += 40
+
+        # Foil-only (or etched-only) prints usually have a glossy/textured scan.
+        if self.nonfoil:
+            score += 30
 
         if self.edition not in ["slc", "sld", "slz"]:
             score += 60
