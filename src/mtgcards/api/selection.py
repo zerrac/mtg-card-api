@@ -1,11 +1,16 @@
 from . import DISLIKED_SETS
 
 
-def _sort_key(pair, preferred_lang, preferred_number, preferred_set):
-    face, image = pair
+def score_rank(face, preferred_lang, preferred_number, preferred_set):
+    """Ranking ignoring sharpness: candidates with equal rank only differ by bluriness."""
     score = face.card.evaluate_score(preferred_lang, preferred_number=preferred_number, preferred_set=preferred_set)
     disliked = 1 if face.card.edition in DISLIKED_SETS else 0
-    return (disliked, -score, -image.bluriness)
+    return (disliked, -score)
+
+
+def _sort_key(pair, preferred_lang, preferred_number, preferred_set):
+    face, image = pair
+    return (*score_rank(face, preferred_lang, preferred_number, preferred_set), -image.bluriness)
 
 
 def sorted_candidates(candidates, preferred_lang="en", preferred_number=None, preferred_set=None):
