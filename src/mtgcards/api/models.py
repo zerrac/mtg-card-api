@@ -52,14 +52,16 @@ class Card(models.Model):
         if self.collector_number.isnumeric():
             score += 50
 
-        if self.frame.isdigit() and int(self.frame) >= 2003:
+        if not self.frame.isdigit():
+            score -= 50
+        elif int(self.frame) >= 2003:
             score += 50
 
         if not self.promo:
-            score += 50
+            score += 40
 
         if self.edition not in ["slc", "sld", "slz"]:
-            score += 10
+            score += 60
 
 
         if preferred_set and self.edition.lower() == preferred_set.lower():
